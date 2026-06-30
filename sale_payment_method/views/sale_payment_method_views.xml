@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="view_sale_payment_method_tree" model="ir.ui.view">
+        <field name="name">sale.payment.method.tree</field>
+        <field name="model">sale.payment.method</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="sequence" widget="handle" />
+                <field name="name" />
+                <field name="active" />
+            </list>
+        </field>
+    </record>
+
+    <record id="view_sale_payment_method_form" model="ir.ui.view">
+        <field name="name">sale.payment.method.form</field>
+        <field name="model">sale.payment.method</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name" />
+                            <field name="sequence" />
+                        </group>
+                        <group>
+                            <field name="active" />
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_sale_payment_method_search" model="ir.ui.view">
+        <field name="name">sale.payment.method.search</field>
+        <field name="model">sale.payment.method</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name" />
+            </search>
+        </field>
+    </record>
+
+    <record id="action_sale_payment_method" model="ir.actions.act_window">
+        <field name="name">Payment Methods</field>
+        <field name="res_model">sale.payment.method</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create a new payment method
+            </p>
+        </field>
+    </record>
+
+    <menuitem
+        id="menu_sale_payment_method"
+        name="Payment Methods"
+        parent="sale.sale_order_menu"
+        action="action_sale_payment_method"
+        sequence="100"
+    />
+</odoo>

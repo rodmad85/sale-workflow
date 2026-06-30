@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo noupdate="1">
+    <record id="sale_payment_method_dinheiro" model="sale.payment.method">
+        <field name="name">Dinheiro</field>
+        <field name="sequence">10</field>
+    </record>
+    <record id="sale_payment_method_cartao_credito" model="sale.payment.method">
+        <field name="name">Cartão de Crédito</field>
+        <field name="sequence">20</field>
+    </record>
+    <record id="sale_payment_method_cartao_debito" model="sale.payment.method">
+        <field name="name">Cartão de Débito</field>
+        <field name="sequence">30</field>
+    </record>
+    <record id="sale_payment_method_transferencia" model="sale.payment.method">
+        <field name="name">Transferência Bancária</field>
+        <field name="sequence">40</field>
+    </record>
+    <record id="sale_payment_method_cheque" model="sale.payment.method">
+        <field name="name">Cheque</field>
+        <field name="sequence">50</field>
+    </record>
+    <record id="sale_payment_method_boleto" model="sale.payment.method">
+        <field name="name">Boleto Bancário</field>
+        <field name="sequence">60</field>
+    </record>
+    <record id="sale_payment_method_pix" model="sale.payment.method">
+        <field name="name">PIX</field>
+        <field name="sequence">70</field>
+    </record>
+</odoo>

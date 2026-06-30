@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="view_order_form_inherit_payment_method" model="ir.ui.view">
+        <field name="name">sale.order.form.inherit.payment.method</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form" />
+        <field name="arch" type="xml">
+            <xpath expr="//group[@name='sale_info']" position="inside">
+                <field
+                    name="payment_method_ids"
+                    widget="many2many_tags"
+                    placeholder="Payment Methods"
+                    options="{'no_create': True}"
+                />
+            </xpath>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_sale_payment_method_salesman,sale.payment.method.salesman,model_sale_payment_method,sales_team.group_sale_salesman,1,1,1,1
+access_sale_payment_method_manager,sale.payment.method.manager,model_sale_payment_method,base.group_system,1,1,1,1
