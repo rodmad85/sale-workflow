@@ -5,14 +5,14 @@
         <field name="model">sale.order</field>
         <field name="inherit_id" ref="sale.view_order_form" />
         <field name="arch" type="xml">
-            <xpath expr="//group[@name='sale_info']" position="inside">
+            <field name="payment_term_id" position="after">
                 <field
                     name="payment_method_ids"
                     widget="many2many_tags"
                     placeholder="Payment Methods"
                     options="{'no_create': True}"
                 />
-            </xpath>
+            </field>
         </field>
     </record>
 </odoo>
