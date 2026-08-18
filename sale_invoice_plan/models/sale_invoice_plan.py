@@ -137,8 +137,33 @@ class SaleInvoicePlan(models.Model):
                     rec.percent = 100 - prev_percent
                     continue
                 rec.percent = rec.amount / rec.sale_id.amount_untaxed * 100
+                if rec.invoice_type == "advance":
+                    rec._redistribute_installments()
                 continue
             rec.percent = 0
+
+    def _redistribute_installments(self):
+        self.ensure_one()
+        sale = self.sale_id
+        Decimal = self.env["decimal.precision"]
+        prec = Decimal.precision_get("Sales Invoice Plan Percent")
+        installment_plans = sale.invoice_plan_ids.filtered(
+            lambda plan: plan.invoice_type == "installment"
+        )
+        invoiced = installment_plans.filtered("invoiced")
+        non_invoiced = installment_plans.filtered(lambda p: not p.invoiced)
+        if not non_invoiced:
+            return
+        invoiced_percent = sum(invoiced.mapped("percent"))
+        remaining = 100 - self.percent - invoiced_percent
+        non_invoiced_sorted = non_invoiced.sorted("installment")
+        num = len(non_invoiced_sorted)
+        base_percent = float_round(remaining / num, prec)
+        for plan in non_invoiced_sorted[:-1]:
+            plan.percent = base_percent
+        non_invoiced_sorted[-1].percent = remaining - sum(
+            non_invoiced_sorted[:-1].mapped("percent")
+        )
 
     def _compute_to_invoice(self):
         """If any invoice is in draft/open/paid do not allow to create inv.
