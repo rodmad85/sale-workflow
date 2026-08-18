@@ -120,7 +120,12 @@ class SaleInvoicePlan(models.Model):
                 installments = rec.sale_id.invoice_plan_ids.filtered(
                     lambda plan: plan.invoice_type == "installment"
                 )
-                prev_amount = sum((installments - rec).mapped("amount"))
+                advance = rec.sale_id.invoice_plan_ids.filtered(
+                    lambda plan: plan.invoice_type == "advance"
+                )
+                prev_amount = sum(
+                    (installments - rec).mapped("amount")
+                ) + sum(advance.mapped("amount"))
                 rec.amount = amount_untaxed - prev_amount
                 continue
             rec.amount = rec.percent * amount_untaxed / 100
