@@ -252,6 +252,31 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
             plans[0].amount + expected_fee,
         )
 
+    def test_installments_distribution_includes_fee(self):
+        order = self._create_sale_order()
+        order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
+        installments = order.invoice_plan_ids.filtered(
+            lambda p: p.invoice_type == "installment"
+        )
+        self.assertAlmostEqual(
+            sum(installments.mapped("amount")),
+            order.amount_untaxed + order.credit_card_fee_amount,
+            places=1,
+        )
+
+    def test_installments_distribution_without_sum_fee(self):
+        order = self._create_sale_order()
+        order.credit_card_fee_line_ids.sum_fee = False
+        order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
+        installments = order.invoice_plan_ids.filtered(
+            lambda p: p.invoice_type == "installment"
+        )
+        self.assertAlmostEqual(
+            sum(installments.mapped("amount")),
+            order.amount_untaxed,
+            places=1,
+        )
+
     def test_installment_invoice_without_sum_fee_has_no_fee_line(self):
         order = self._create_sale_order()
         order.credit_card_fee_line_ids.sum_fee = False
