@@ -17,9 +17,7 @@ def migrate(cr, version):
 
     # Build a payment method per card administrator, reusing an existing
     # link when there is already a payment method pointing to the admin.
-    cr.execute(
-        "SELECT id, name FROM credit_card_admin WHERE active IS NOT FALSE"
-    )
+    cr.execute("SELECT id, name FROM credit_card_admin WHERE active IS NOT FALSE")
     admins = cr.fetchall()
     if not admins:
         return
@@ -58,8 +56,7 @@ def migrate(cr, version):
     # Move the fee ranges from the administrator to the payment method.
     if not sql.column_exists(cr, "credit_card_fee_range", "payment_method_id"):
         cr.execute(
-            "ALTER TABLE credit_card_fee_range "
-            "ADD COLUMN payment_method_id INT4"
+            "ALTER TABLE credit_card_fee_range " "ADD COLUMN payment_method_id INT4"
         )
     cr.execute(
         """
@@ -70,13 +67,10 @@ def migrate(cr, version):
         """
     )
     cr.execute(
-        "SELECT COUNT(*) FROM credit_card_fee_range "
-        "WHERE payment_method_id IS NULL"
+        "SELECT COUNT(*) FROM credit_card_fee_range " "WHERE payment_method_id IS NULL"
     )
     if cr.fetchone()[0]:
-        cr.execute(
-            "SELECT payment_method_id FROM l10n_br_ccf_mig_admin LIMIT 1"
-        )
+        cr.execute("SELECT payment_method_id FROM l10n_br_ccf_mig_admin LIMIT 1")
         fallback = cr.fetchone()[0]
         if fallback:
             cr.execute(

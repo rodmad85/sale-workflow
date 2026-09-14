@@ -1,4 +1,5 @@
 from odoo.tests import Form
+
 from odoo.addons.account.tests.common import AccountTestInvoicingCommon
 from odoo.addons.sale.models.sale_order import SaleOrder
 
@@ -96,9 +97,7 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
     def test_fee_percent_by_installments(self):
         order = self._create_sale_order()
         order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
-        self.assertEqual(
-            order.credit_card_fee_line_ids.fee_percent, 2.5
-        )
+        self.assertEqual(order.credit_card_fee_line_ids.fee_percent, 2.5)
         self.assertEqual(order.credit_card_fee_percent, 2.5)
         self.assertAlmostEqual(
             order.credit_card_fee_amount,
@@ -112,15 +111,11 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
         self.assertEqual(order.credit_card_fee_percent, 3.5)
 
     def test_multiple_admin_methods(self):
-        order = self._create_sale_order(
-            [self.payment_method, self.second_method]
-        )
+        order = self._create_sale_order([self.payment_method, self.second_method])
         self.assertEqual(len(order.credit_card_fee_line_ids), 2)
         order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
         self.assertEqual(order.credit_card_fee_percent, 2.5 + 1.5)
-        expected_fee = (
-            order.amount_untaxed + order.amount_tax
-        ) * (2.5 + 1.5) / 100.0
+        expected_fee = (order.amount_untaxed + order.amount_tax) * (2.5 + 1.5) / 100.0
         self.assertEqual(order.credit_card_fee_amount, expected_fee)
 
     def test_no_fee_without_admin(self):
@@ -138,9 +133,7 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
         order = self._create_sale_order()
         total_before = order.amount_total
         order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
-        expected_fee = round(
-            (order.amount_untaxed + order.amount_tax) * 0.025, 2
-        )
+        expected_fee = round((order.amount_untaxed + order.amount_tax) * 0.025, 2)
         expected_total = total_before + expected_fee
         self.assertEqual(order.amount_total, expected_total)
         self.assertAlmostEqual(order.credit_card_amount_plus_fee, expected_total)
@@ -244,9 +237,7 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
             lambda p: p.invoice_type == "installment"
         ).sorted("installment")
         move = order.with_context(invoice_plan_id=plans[0].id)._create_invoices()
-        product = self.env.ref(
-            "l10n_br_sale_credit_card_fee.product_credit_card_fee"
-        )
+        product = self.env.ref("sale_credit_card_fee.product_credit_card_fee")
         fee_lines = move.invoice_line_ids.filtered(
             lambda line: line.product_id == product
         )
@@ -271,9 +262,7 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
             lambda p: p.invoice_type == "installment"
         ).sorted("installment")
         move = order.with_context(invoice_plan_id=plans[0].id)._create_invoices()
-        product = self.env.ref(
-            "l10n_br_sale_credit_card_fee.product_credit_card_fee"
-        )
+        product = self.env.ref("sale_credit_card_fee.product_credit_card_fee")
         self.assertFalse(
             move.invoice_line_ids.filtered(lambda line: line.product_id == product)
         )
@@ -300,9 +289,7 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
         order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
         self._confirm_sale_order(order)
         move = order._create_invoices()
-        product = self.env.ref(
-            "l10n_br_sale_credit_card_fee.product_credit_card_fee"
-        )
+        product = self.env.ref("sale_credit_card_fee.product_credit_card_fee")
         fee_lines = move.invoice_line_ids.filtered(
             lambda line: line.product_id == product
         )
@@ -319,9 +306,7 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
         order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
         self._confirm_sale_order(order)
         move = order._create_invoices()
-        product = self.env.ref(
-            "l10n_br_sale_credit_card_fee.product_credit_card_fee"
-        )
+        product = self.env.ref("sale_credit_card_fee.product_credit_card_fee")
         self.assertFalse(
             move.invoice_line_ids.filtered(lambda line: line.product_id == product)
         )

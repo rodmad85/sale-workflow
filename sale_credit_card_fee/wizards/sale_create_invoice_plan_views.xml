@@ -17,8 +17,14 @@
             <xpath expr="//form/group" position="after">
                 <group invisible="not sale_id.credit_card_fee_line_ids">
                     <group>
-                        <field name="credit_card_fee_percent" string="Credit Card Fee (%)" />
-                        <field name="credit_card_fee_amount" string="Credit Card Fee Amount" />
+                        <field
+                            name="credit_card_fee_percent"
+                            string="Credit Card Fee (%)"
+                        />
+                        <field
+                            name="credit_card_fee_amount"
+                            string="Credit Card Fee Amount"
+                        />
                     </group>
                     <group>
                         <field name="amount_plus_fee" string="Amount + Fee" />

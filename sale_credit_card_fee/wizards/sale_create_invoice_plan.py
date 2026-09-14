@@ -49,8 +49,9 @@ class SaleCreateInvoicePlan(models.TransientModel):
                 fee = line.fee_range_id
                 if not fee and rec.num_installment and line.payment_method_id:
                     fee = line.payment_method_id.fee_line_ids.filtered(
-                        lambda r: r.installments_from <= rec.num_installment
-                        and r.installments_to >= rec.num_installment
+                        lambda r, n=rec.num_installment: (
+                            r.installments_from <= n and r.installments_to >= n
+                        )
                     )[:1]
                 if fee:
                     percent += fee.fee_percent or 0.0

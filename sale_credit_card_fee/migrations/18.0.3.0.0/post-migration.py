@@ -1,3 +1,5 @@
+from psycopg2.sql import SQL, Identifier
+
 import odoo.tools.sql as sql
 
 
@@ -13,32 +15,36 @@ def _copy_rel_table(
     if sql.table_exists(cr, source):
         if not sql.table_exists(cr, target):
             cr.execute(
-                "CREATE TABLE %s (%s INT4 NOT NULL, %s INT4 NOT NULL)"
-                % (target, source_column, target_column)
+                SQL("CREATE TABLE {} ({} INT4 NOT NULL, {} INT4 NOT NULL)").format(
+                    Identifier(target),
+                    Identifier(source_column),
+                    Identifier(target_column),
+                )
             )
         cr.execute(
-            "INSERT INTO %s (%s, %s) "
-            "SELECT r.%s, m.new_id "
-            "FROM %s r "
-            "JOIN %s m ON m.old_id = r.%s "
-            "WHERE NOT EXISTS ("
-            "SELECT 1 FROM %s x "
-            "WHERE x.%s = r.%s AND x.%s = m.new_id)"
-            % (
-                target,
-                source_column,
-                target_column,
-                source_column,
-                source,
-                map_table,
-                old_pm_column,
-                target,
-                source_column,
-                source_column,
-                target_column,
+            SQL(
+                "INSERT INTO {} ({}, {}) "
+                "SELECT r.{}, m.new_id "
+                "FROM {} r "
+                "JOIN {} m ON m.old_id = r.{} "
+                "WHERE NOT EXISTS ("
+                "SELECT 1 FROM {} x "
+                "WHERE x.{} = r.{} AND x.{} = m.new_id)"
+            ).format(
+                Identifier(target),
+                Identifier(source_column),
+                Identifier(target_column),
+                Identifier(source_column),
+                Identifier(source),
+                Identifier(map_table),
+                Identifier(old_pm_column),
+                Identifier(target),
+                Identifier(source_column),
+                Identifier(source_column),
+                Identifier(target_column),
             )
         )
-        cr.execute("DROP TABLE IF EXISTS %s" % source)
+        cr.execute(SQL("DROP TABLE IF EXISTS {}").format(Identifier(source)))
 
 
 def migrate(cr, version):

@@ -6,7 +6,7 @@
     "summary": "Add payment method to sale orders and invoices",
     "version": "18.0.1.0.0",
     "category": "Sales Management",
-    "website": "https://www.madooit.com",
+    "website": "https://github.com/OCA/sale-workflow",
     "author": "Madooit, Rodrigo A. Madureira, Odoo Community Association (OCA)",
     "license": "AGPL-3",
     "application": False,

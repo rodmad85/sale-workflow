@@ -16,7 +16,6 @@ class AccountMove(models.Model):
         compute="_compute_credit_card_fee",
     )
     credit_card_fee_amount = fields.Monetary(
-        string="Credit Card Fee Amount",
         compute="_compute_credit_card_fee",
     )
     credit_card_amount_plus_fee = fields.Monetary(
@@ -30,6 +29,4 @@ class AccountMove(models.Model):
             order = move.invoice_line_ids.sale_line_ids.order_id[:1]
             move.credit_card_fee_percent = order.credit_card_fee_percent or 0.0
             move.credit_card_fee_amount = order.credit_card_fee_amount or 0.0
-            move.credit_card_amount_plus_fee = (
-                order.credit_card_amount_plus_fee or 0.0
-            )
+            move.credit_card_amount_plus_fee = order.credit_card_amount_plus_fee or 0.0

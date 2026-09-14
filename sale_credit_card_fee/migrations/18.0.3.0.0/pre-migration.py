@@ -1,6 +1,8 @@
 import json
 import re
 
+from psycopg2.sql import SQL, Identifier
+
 import odoo.tools.sql as sql
 
 
@@ -59,8 +61,7 @@ def migrate(cr, version):
     # and keep the mapping so the fee ranges and fee lines can follow.
     cr.execute("DROP TABLE IF EXISTS l10n_br_ccf_pm_map")
     cr.execute(
-        "CREATE TABLE l10n_br_ccf_pm_map ("
-        "old_id INT4 PRIMARY KEY, new_id INT4)"
+        "CREATE TABLE l10n_br_ccf_pm_map (" "old_id INT4 PRIMARY KEY, new_id INT4)"
     )
     cr.execute(
         "SELECT id, name, sequence, active, COALESCE(credit_card_admin, FALSE) "
@@ -70,11 +71,9 @@ def migrate(cr, version):
         name = name or {}
         en_name = name.get("en_US") or name.get("pt_BR") or "Payment Method"
         code = _slug(en_name)
-        cr.execute(
-            "SELECT 1 FROM payment_method WHERE code = %s LIMIT 1", (code,)
-        )
+        cr.execute("SELECT 1 FROM payment_method WHERE code = %s LIMIT 1", (code,))
         if cr.fetchone():
-            code = "%s_%s" % (code, old_id)
+            code = f"{code}_{old_id}"
         cr.execute(
             "INSERT INTO payment_method "
             "(name, code, sequence, active, support_refund, credit_card_admin, "
@@ -92,18 +91,17 @@ def migrate(cr, version):
             ),
         )
         new_id = cr.fetchone()[0]
-        cr.execute(
-            "INSERT INTO l10n_br_ccf_pm_map VALUES (%s, %s)", (old_id, new_id)
-        )
+        cr.execute("INSERT INTO l10n_br_ccf_pm_map VALUES (%s, %s)", (old_id, new_id))
 
     # Drop the old foreign keys before remapping the rows: they still
     # reference sale_payment_method and would reject the new values.
     for table in ("credit_card_fee_range", "sale_order_credit_card_fee_line"):
         if sql.table_exists(cr, table):
             cr.execute(
-                "ALTER TABLE %s "
-                "DROP CONSTRAINT IF EXISTS %s_payment_method_id_fkey"
-                % (table, table)
+                SQL("ALTER TABLE {} DROP CONSTRAINT IF EXISTS {}").format(
+                    Identifier(table),
+                    Identifier(f"{table}_payment_method_id_fkey"),
+                )
             )
 
     # Point the fee ranges and the sale order fee lines at the new records.

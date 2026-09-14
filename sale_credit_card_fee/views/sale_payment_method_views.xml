@@ -1,16 +1,24 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <odoo>
-
     <record id="view_sale_payment_method_form_inherit_card_fee" model="ir.ui.view">
         <field name="name">sale.payment.method.form.inherit.card.fee</field>
         <field name="model">sale.payment.method</field>
-        <field name="inherit_id" ref="sale_payment_method.view_sale_payment_method_form" />
+        <field
+            name="inherit_id"
+            ref="sale_payment_method.view_sale_payment_method_form"
+        />
         <field name="arch" type="xml">
             <field name="active" position="before">
-                <field name="credit_card_admin" />
+                <field
+                    name="credit_card_admin"
+                    groups="sales_team.group_sale_manager"
+                />
             </field>
             <xpath expr="//sheet/group" position="after">
-                <notebook invisible="not credit_card_admin">
+                <notebook
+                    groups="sales_team.group_sale_manager"
+                    invisible="not credit_card_admin"
+                >
                     <page string="Fee Ranges" name="fee_ranges">
                         <field name="fee_line_ids" nolabel="1">
                             <list editable="bottom">
@@ -24,5 +32,4 @@
             </xpath>
         </field>
     </record>
-
 </odoo>

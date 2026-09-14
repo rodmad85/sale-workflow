@@ -27,9 +27,9 @@ class CreditCardFeeRange(models.Model):
     @api.depends("installments_from", "fee_percent")
     def _compute_name(self):
         for rec in self:
-            rec.name = "%sX - %s%%" % (
+            rec.name = "{}X - {}%".format(
                 rec.installments_from,
-                ("%.2f" % rec.fee_percent).replace(".", ","),
+                (f"{rec.fee_percent:.2f}").replace(".", ","),
             )
 
     @api.constrains("installments_from", "installments_to")

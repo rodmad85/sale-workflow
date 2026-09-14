@@ -61,7 +61,8 @@ class SaleOrderCreditCardFeeLine(models.Model):
             if not num_installments:
                 continue
             fee = line.payment_method_id.fee_line_ids.filtered(
-                lambda r: r.installments_from <= num_installments
-                and r.installments_to >= num_installments
+                lambda r, n=num_installments: (
+                    r.installments_from <= n and r.installments_to >= n
+                )
             )[:1]
             line.fee_percent = fee.fee_percent if fee else 0.0

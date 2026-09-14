@@ -40,9 +40,7 @@ class SaleOrder(models.Model):
         card_admins = self.payment_method_ids.filtered("credit_card_admin")
         commands = [(5, 0, 0)]
         for method in card_admins:
-            commands.append(
-                (0, 0, {"payment_method_id": method.id})
-            )
+            commands.append((0, 0, {"payment_method_id": method.id}))
         self.credit_card_fee_line_ids = commands
 
     def _sync_credit_card_fee_lines(self):
@@ -58,7 +56,7 @@ class SaleOrder(models.Model):
                     }
                 )
             lines_to_remove = order.credit_card_fee_line_ids.filtered(
-                lambda line: line.payment_method_id not in card_admins
+                lambda line, admins=card_admins: (line.payment_method_id not in admins)
             )
             if lines_to_remove:
                 lines_to_remove.unlink()
@@ -117,9 +115,7 @@ class SaleOrder(models.Model):
         plan = self.env["sale.invoice.plan"].browse(
             self.env.context.get("invoice_plan_id") or 0
         )
-        product = self.env.ref(
-            "l10n_br_sale_credit_card_fee.product_credit_card_fee"
-        )
+        product = self.env.ref("sale_credit_card_fee.product_credit_card_fee")
         for order in self:
             fee_lines = order.credit_card_fee_line_ids.filtered("sum_fee")
             if not fee_lines or not order.credit_card_fee_percent:
@@ -136,7 +132,7 @@ class SaleOrder(models.Model):
                 if move.move_type != "out_invoice":
                     continue
                 if not move.invoice_line_ids.sale_line_ids.filtered(
-                    lambda line: line.order_id == order
+                    lambda line, order=order: line.order_id == order
                 ):
                     continue
                 if move.invoice_line_ids.filtered(
@@ -146,18 +142,23 @@ class SaleOrder(models.Model):
                 lines = []
                 for fee_line in fee_lines:
                     lines.append(
-                        (0, 0, {
-                            "product_id": product.id,
-                            "name": self.env._("Credit Card Fee (%s%%) - %s") % (
-                                fee_line.fee_percent,
-                                fee_line.payment_method_id.name,
-                            ),
-                            "quantity": 1,
-                            "price_unit": fee_amount
-                            * fee_line.fee_percent
-                            / order.credit_card_fee_percent,
-                            "tax_ids": [(5, 0, 0)],
-                        })
+                        (
+                            0,
+                            0,
+                            {
+                                "product_id": product.id,
+                                "name": self.env._("Credit Card Fee (%s%%) - %s")
+                                % (
+                                    fee_line.fee_percent,
+                                    fee_line.payment_method_id.name,
+                                ),
+                                "quantity": 1,
+                                "price_unit": fee_amount
+                                * fee_line.fee_percent
+                                / order.credit_card_fee_percent,
+                                "tax_ids": [(5, 0, 0)],
+                            },
+                        )
                     )
                 move.write({"invoice_line_ids": lines})
         return moves
