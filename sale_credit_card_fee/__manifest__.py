@@ -1,0 +1,22 @@
+{
+    "name": "Sale Credit Card Fee",
+    "category": "Sales",
+    "license": "AGPL-3",
+    "author": "Madooit, Odoo Community Association (OCA)",
+    "website": "https://github.com/OCA/sale-workflow",
+    "summary": "Sale Card Fee",
+    "version": "18.0.3.4.0",
+    "depends": ["sale_management", "sale_payment_method", "sale_invoice_plan"],
+    "data": [
+        "security/l10n_br_sale_credit_card_fee_security.xml",
+        "security/ir.model.access.csv",
+        "data/product.xml",
+        "views/payment_method_views.xml",
+        "views/sale_order_views.xml",
+        "views/account_move_views.xml",
+        "wizards/sale_create_invoice_plan_views.xml",
+    ],
+    "demo": [],
+    "installable": True,
+    "development_status": "Beta",
+}

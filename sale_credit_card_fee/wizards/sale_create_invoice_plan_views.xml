@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Copyright 2026 - Today, OCA Contributors
+     License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl). -->
+<odoo>
+    <record id="view_sale_create_invoice_plan_credit_card_fee" model="ir.ui.view">
+        <field name="name">sale.create.invoice.plan.view.form.credit.card.fee</field>
+        <field name="model">sale.create.invoice.plan</field>
+        <field
+            name="inherit_id"
+            ref="sale_invoice_plan.view_sale_create_invoice_plan"
+        />
+        <field name="arch" type="xml">
+            <field name="installment_date" position="after">
+                <field name="sale_id" invisible="1" />
+                <field name="currency_id" invisible="1" />
+            </field>
+            <xpath expr="//form/group" position="after">
+                <group invisible="not sale_id.credit_card_fee_line_ids">
+                    <group>
+                        <field name="credit_card_fee_percent" string="Credit Card Fee (%)" />
+                        <field name="credit_card_fee_amount" string="Credit Card Fee Amount" />
+                    </group>
+                    <group>
+                        <field name="amount_plus_fee" string="Amount + Fee" />
+                    </group>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>
