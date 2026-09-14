@@ -8,7 +8,6 @@
     "version": "18.0.3.4.0",
     "depends": ["sale_management", "sale_payment_method", "sale_invoice_plan"],
     "data": [
-        "security/l10n_br_sale_credit_card_fee_security.xml",
         "security/ir.model.access.csv",
         "data/product.xml",
         "views/payment_method_views.xml",
