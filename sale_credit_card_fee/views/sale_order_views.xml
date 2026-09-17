@@ -5,7 +5,7 @@
         <field name="model">sale.order</field>
         <field name="inherit_id" ref="sale.view_order_form" />
         <field name="arch" type="xml">
-            <field name="payment_method_ids" position="before">
+            <field name="payment_method_ids" position="after">
                 <div invisible="not credit_card_fee_line_ids" class="mt-2">
                     <group string="Credit Card Fees">
                         <field name="credit_card_fee_line_ids" colspan="2" nolabel="1">

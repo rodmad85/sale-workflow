@@ -15,6 +15,11 @@
         "views/account_move_views.xml",
         "wizards/sale_create_invoice_plan_views.xml",
     ],
+    "assets": {
+        "web.assets_backend": [
+            "sale_credit_card_fee/static/src/**/*",
+        ],
+    },
     "demo": [],
     "installable": True,
     "development_status": "Beta",
