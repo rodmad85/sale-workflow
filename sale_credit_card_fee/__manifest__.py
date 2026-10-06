@@ -7,7 +7,7 @@
     "version": "18.0.1.0.0",
     "depends": ["sale_management", "sale_payment_method", "sale_invoice_plan"],
     "data": [
-        "security/credit_card_fee_security.xml",
+        "security/sale_credit_card_fee_security.xml",
         "security/ir.model.access.csv",
         "data/product.xml",
         "views/credit_card_admin_views.xml",
