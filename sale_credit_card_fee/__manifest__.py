@@ -13,7 +13,6 @@
         "views/credit_card_admin_views.xml",
         "views/sale_payment_method_views.xml",
         "views/sale_order_views.xml",
-        "views/sale_invoice_plan_views.xml",
         "wizards/sale_create_invoice_plan_views.xml",
     ],
     "demo": [],

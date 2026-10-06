@@ -27,11 +27,6 @@
                         <field name="fee_amount" />
                     </list>
                 </field>
-            </field>
-            <xpath
-                expr="//group[@name='sale_total']/field[@name='tax_totals']"
-                position="after"
-            >
                 <field
                     name="credit_card_fee_percent"
                     readonly="1"
@@ -42,7 +37,7 @@
                     readonly="1"
                     invisible="not credit_card_fee_line_ids"
                 />
-            </xpath>
+            </field>
         </field>
     </record>
 </odoo>
