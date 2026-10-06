@@ -10,27 +10,25 @@
             ref="sale_invoice_plan.view_sale_create_invoice_plan"
         />
         <field name="arch" type="xml">
+            <!-- 1st column: user inputs -->
             <field name="installment_date" position="after">
+                <field name="credit_card_admin_id" options="{'no_create_edit': True}" />
+                <field name="sum_fee" invisible="not credit_card_admin_id" />
+            </field>
+            <!-- 2nd column: computed fee info -->
+            <field name="advance" position="after">
                 <field name="sale_id" invisible="1" />
                 <field name="currency_id" invisible="1" />
+                <field
+                    name="credit_card_fee_percent"
+                    invisible="not credit_card_admin_id"
+                />
+                <field
+                    name="credit_card_fee_amount"
+                    invisible="not credit_card_admin_id"
+                />
+                <field name="amount_plus_fee" invisible="not credit_card_admin_id" />
             </field>
-            <xpath expr="//form/group" position="after">
-                <group invisible="not sale_id.credit_card_fee_line_ids">
-                    <group>
-                        <field
-                            name="credit_card_fee_percent"
-                            string="Credit Card Fee (%)"
-                        />
-                        <field
-                            name="credit_card_fee_amount"
-                            string="Credit Card Fee Amount"
-                        />
-                    </group>
-                    <group>
-                        <field name="amount_plus_fee" string="Amount + Fee" />
-                    </group>
-                </group>
-            </xpath>
         </field>
     </record>
 </odoo>
