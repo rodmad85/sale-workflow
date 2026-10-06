@@ -12,17 +12,17 @@ class SaleInvoicePlan(models.Model):
         string="Fee Amount",
         digits="Product Price",
         compute="_compute_fee_amount",
+        store=True,
     )
 
     @api.depends(
-        "sale_id.credit_card_admin_id",
         "sale_id.credit_card_fee_amount",
         "amount",
         "invoice_type",
     )
     def _compute_fee_amount(self):
         for rec in self:
-            if not rec.sale_id.credit_card_admin_id or not rec.sale_id.credit_card_fee_amount:
+            if not rec.sale_id.credit_card_fee_amount:
                 rec.credit_card_fee_amount = 0.0
                 continue
             if rec.invoice_type != "installment":

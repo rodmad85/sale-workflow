@@ -4,17 +4,19 @@ from odoo import api, fields, models
 class SaleOrder(models.Model):
     _inherit = "sale.order"
 
-    credit_card_admin_id = fields.Many2one(
-        comodel_name="credit.card.admin",
-        string="Card Administrator",
-        ondelete="restrict",
-        copy=False,
+    payment_method_ids = fields.Many2many(
+        comodel_name="payment.method",
+        relation="sale_order_payment_method_rel",
+        column1="sale_order_id",
+        column2="payment_method_id",
+        string="Payment Methods",
     )
-    credit_card_sum_fee = fields.Boolean(
-        string="Add Fee",
-        default=True,
-        copy=False,
-        help="Add the credit card fee to the order total.",
+
+    credit_card_fee_line_ids = fields.One2many(
+        comodel_name="sale.order.credit.card.fee.line",
+        inverse_name="sale_order_id",
+        string="Card Administrator Fees",
+        copy=True,
     )
     credit_card_fee_percent = fields.Float(
         string="Fee (%)",
@@ -32,77 +34,80 @@ class SaleOrder(models.Model):
         compute="_compute_amounts",
         store=True,
     )
-    credit_card_fee_range_ids = fields.Many2many(
-        comodel_name="credit.card.fee.range",
-        compute="_compute_credit_card_fee_range_ids",
-    )
-
-    @api.depends("credit_card_admin_id")
-    def _compute_credit_card_fee_range_ids(self):
-        for order in self:
-            order.credit_card_fee_range_ids = (
-                order.credit_card_admin_id.fee_line_ids
-                if order.credit_card_admin_id
-                else self.env["credit.card.fee.range"]
-            )
 
     @api.onchange("payment_method_ids")
     def _onchange_payment_method_ids(self):
-        admin = self.payment_method_ids.filtered(
-            "credit_card_admin_id"
-        ).mapped("credit_card_admin_id")[:1]
-        if admin:
-            self.credit_card_admin_id = admin
+        card_admins = self.payment_method_ids.filtered("credit_card_admin")
+        commands = [(5, 0, 0)]
+        for method in card_admins:
+            commands.append((0, 0, {"payment_method_id": method.id}))
+        self.credit_card_fee_line_ids = commands
+
+    def _sync_credit_card_fee_lines(self):
+        """Keep one fee line per selected card administrator payment method."""
+        for order in self:
+            card_admins = order.payment_method_ids.filtered("credit_card_admin")
+            existing = order.credit_card_fee_line_ids.mapped("payment_method_id")
+            for method in card_admins - existing:
+                self.env["sale.order.credit.card.fee.line"].create(
+                    {
+                        "sale_order_id": order.id,
+                        "payment_method_id": method.id,
+                    }
+                )
+            lines_to_remove = order.credit_card_fee_line_ids.filtered(
+                lambda line, admins=card_admins: (line.payment_method_id not in admins)
+            )
+            if lines_to_remove:
+                lines_to_remove.unlink()
+
+    def create(self, vals_list):
+        orders = super().create(vals_list)
+        orders._sync_credit_card_fee_lines()
+        return orders
+
+    def write(self, vals):
+        res = super().write(vals)
+        if vals.get("payment_method_ids"):
+            self._sync_credit_card_fee_lines()
+        return res
 
     @api.depends(
-        "credit_card_admin_id",
-        "invoice_plan_ids",
-        "invoice_plan_ids.installment",
+        "credit_card_fee_line_ids",
+        "credit_card_fee_line_ids.fee_percent",
     )
     def _compute_credit_card_fee(self):
         for order in self:
-            if not order.credit_card_admin_id:
-                order.credit_card_fee_percent = 0.0
-                continue
-            installments = order.invoice_plan_ids.filtered(
-                lambda p: p.invoice_type == "installment"
+            percent = sum(
+                (line.fee_percent or 0.0) for line in order.credit_card_fee_line_ids
             )
-            num_installments = len(installments)
-            if not num_installments:
-                order.credit_card_fee_percent = 0.0
-                continue
-            fee = self.env["credit.card.fee.range"].search(
-                [
-                    ("admin_id", "=", order.credit_card_admin_id.id),
-                    ("installments_from", "<=", num_installments),
-                    ("installments_to", ">=", num_installments),
-                ],
-                limit=1,
-            )
-            order.credit_card_fee_percent = fee.fee_percent if fee else 0.0
+            order.credit_card_fee_percent = percent
 
     @api.depends(
         "order_line.price_subtotal",
+        "order_line.price_total",
+        "amount_tax",
         "currency_id",
         "company_id",
         "payment_term_id",
-        "credit_card_sum_fee",
-        "credit_card_fee_percent",
+        "credit_card_fee_line_ids",
+        "credit_card_fee_line_ids.sum_fee",
+        "credit_card_fee_line_ids.fee_percent",
     )
     def _compute_amounts(self):
         res = super()._compute_amounts()
         for order in self:
-            if (
-                order.credit_card_admin_id
-                and order.credit_card_sum_fee
-                and order.credit_card_fee_percent
-            ):
-                fee = order.amount_untaxed * order.credit_card_fee_percent / 100.0
-                order.credit_card_fee_amount = fee
-                order.amount_total += fee
-            else:
-                order.credit_card_fee_amount = 0.0
-            order.credit_card_amount_plus_fee = order.amount_total
+            base = order.amount_untaxed + order.amount_tax
+            fee = 0.0
+            fee_to_add = 0.0
+            for line in order.credit_card_fee_line_ids:
+                line_fee = base * (line.fee_percent or 0.0) / 100.0
+                fee += line_fee
+                if line.sum_fee:
+                    fee_to_add += line_fee
+            order.credit_card_fee_amount = fee
+            order.amount_total += fee_to_add
+            order.credit_card_amount_plus_fee = base + fee
         return res
 
     def _create_invoices(self, grouped=False, final=False, date=None):
@@ -110,37 +115,50 @@ class SaleOrder(models.Model):
         plan = self.env["sale.invoice.plan"].browse(
             self.env.context.get("invoice_plan_id") or 0
         )
-        if not plan.exists():
-            return moves
-        order = plan.sale_id
-        if (
-            not order.credit_card_admin_id
-            or not order.credit_card_sum_fee
-            or not plan.credit_card_fee_amount
-        ):
-            return moves
-        product = self.env.ref("l10n_br_sale_credit_card_fee.product_credit_card_fee")
-        name = self.env._("Credit Card Fee (%s%%)") % order.credit_card_fee_percent
-        for move in moves:
-            if move.move_type != "out_invoice":
+        product = self.env.ref("sale_credit_card_fee.product_credit_card_fee")
+        for order in self:
+            fee_lines = order.credit_card_fee_line_ids.filtered("sum_fee")
+            if not fee_lines or not order.credit_card_fee_percent:
                 continue
-            if move.invoice_line_ids.filtered(lambda line: line.product_id == product):
+            if plan.exists():
+                if plan.sale_id != order or not plan.credit_card_fee_amount:
+                    continue
+                fee_amount = plan.credit_card_fee_amount
+            else:
+                fee_amount = order.credit_card_fee_amount
+            if not fee_amount:
                 continue
-            move.write(
-                {
-                    "invoice_line_ids": [
+            for move in moves:
+                if move.move_type != "out_invoice":
+                    continue
+                if not move.invoice_line_ids.sale_line_ids.filtered(
+                    lambda line, order=order: line.order_id == order
+                ):
+                    continue
+                if move.invoice_line_ids.filtered(
+                    lambda line: line.product_id == product
+                ):
+                    continue
+                lines = []
+                for fee_line in fee_lines:
+                    lines.append(
                         (
                             0,
                             0,
                             {
                                 "product_id": product.id,
-                                "name": name,
+                                "name": self.env._("Credit Card Fee (%s%%) - %s")
+                                % (
+                                    fee_line.fee_percent,
+                                    fee_line.payment_method_id.name,
+                                ),
                                 "quantity": 1,
-                                "price_unit": plan.credit_card_fee_amount,
+                                "price_unit": fee_amount
+                                * fee_line.fee_percent
+                                / order.credit_card_fee_percent,
                                 "tax_ids": [(5, 0, 0)],
                             },
                         )
-                    ]
-                }
-            )
+                    )
+                move.write({"invoice_line_ids": lines})
         return moves

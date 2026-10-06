@@ -3,12 +3,13 @@ fees based on the installments defined by the Sale Invoice Plan.
 
 It allows you to:
 
-- Configure credit card administrators and their fee tables per
-  installment range.
-- Select the card administrator and the number of installments in the
-  **Create Invoice Plan** wizard, with a live fee preview.
-- Optionally sum the credit card fee to the sale order total (**Sum
-  Fee**).
+- Mark a payment method as **Card Administrator** and configure its fee
+  table per installment range directly in the payment method form
+  (**Fee Ranges** tab).
+- Define, on the sale order, the fee configuration for each selected
+  payment method marked as Card Administrator: **Add Fee** and
+  **Credit Card Fee Range**.
+- Optionally sum the credit card fee to the sale order total.
 - Include the credit card fee in each installment invoice,
   proportionally to the planned amount.
 - View the fee distribution across installments in the invoice plan.

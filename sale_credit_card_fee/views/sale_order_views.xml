@@ -6,26 +6,65 @@
         <field name="inherit_id" ref="sale.view_order_form" />
         <field name="arch" type="xml">
             <field name="payment_method_ids" position="after">
-                <field name="credit_card_admin_id" />
-                <field
-                    name="credit_card_sum_fee"
-                    invisible="not credit_card_admin_id"
-                />
-                <field
-                    name="credit_card_fee_range_ids"
-                    invisible="not credit_card_admin_id"
-                    readonly="1"
-                    context="{'credit_card_order_id': id}"
-                >
-                    <list>
-                        <field name="currency_id" column_invisible="True" />
-                        <field name="installments_from" string="Parcela De" />
-                        <field name="installments_to" string="Parcela Até" />
-                        <field name="fee_percent" string="Taxa (%)" />
-                        <field name="amount" string="Valor" />
-                    </list>
-                </field>
+                <div invisible="not credit_card_fee_line_ids" class="mt-2">
+                    <group string="Credit Card Fees">
+                        <field name="credit_card_fee_line_ids" colspan="2" nolabel="1">
+                            <list editable="bottom" create="false" delete="false">
+                                <field
+                                    name="payment_method_id"
+                                    string="Credit Card Administrator"
+                                    readonly="1"
+                                    force_save="1"
+                                />
+                                <field name="sum_fee" string="Add Fee" />
+                                <field
+                                    name="fee_range_id"
+                                    string="Credit Card Fee Range"
+                                />
+                                <field name="fee_percent" string="Fee (%)" />
+                            </list>
+                        </field>
+                    </group>
+                </div>
             </field>
+            <xpath
+                expr="//group[@name='sale_total']/field[@name='tax_totals']"
+                position="before"
+            >
+                <div
+                    class="d-flex justify-content-between"
+                    invisible="not credit_card_fee_amount"
+                >
+                    <label for="credit_card_fee_percent" string="Fee (%)" class="m-0" />
+                    <field name="credit_card_fee_percent" nolabel="1" readonly="1" />
+                </div>
+                <div
+                    class="d-flex justify-content-between"
+                    invisible="not credit_card_fee_amount"
+                >
+                    <label
+                        for="credit_card_fee_amount"
+                        string="Fee Amount"
+                        class="m-0"
+                    />
+                    <field name="credit_card_fee_amount" nolabel="1" readonly="1" />
+                </div>
+                <div
+                    class="d-flex justify-content-between"
+                    invisible="not credit_card_fee_amount"
+                >
+                    <label
+                        for="credit_card_amount_plus_fee"
+                        string="Amount + Fee"
+                        class="m-0"
+                    />
+                    <field
+                        name="credit_card_amount_plus_fee"
+                        nolabel="1"
+                        readonly="1"
+                    />
+                </div>
+            </xpath>
         </field>
     </record>
 </odoo>

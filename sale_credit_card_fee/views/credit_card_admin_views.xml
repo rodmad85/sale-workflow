@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <odoo>
-
     <!-- Credit Card Fee Range Tree (inline in admin form) -->
     <record id="credit_card_fee_range_form" model="ir.ui.view">
         <field name="name">credit.card.fee.range.form</field>
@@ -15,7 +14,10 @@
                         </group>
                         <group>
                             <field name="fee_percent" />
-                            <field name="company_id" groups="base.group_multi_company" />
+                            <field
+                                name="company_id"
+                                groups="base.group_multi_company"
+                            />
                         </group>
                     </group>
                 </sheet>
@@ -42,8 +44,12 @@
         <field name="arch" type="xml">
             <form>
                 <sheet>
-                    <widget name="web_ribbon" title="Active" bg_color="text-bg-success"
-                            invisible="not active" />
+                    <widget
+                        name="web_ribbon"
+                        title="Active"
+                        bg_color="text-bg-success"
+                        invisible="not active"
+                    />
                     <div class="oe_title">
                         <h1>
                             <field name="name" placeholder="Card Administrator Name" />
@@ -51,7 +57,10 @@
                     </div>
                     <group>
                         <group>
-                            <field name="company_id" groups="base.group_multi_company" />
+                            <field
+                                name="company_id"
+                                groups="base.group_multi_company"
+                            />
                         </group>
                         <group>
                             <field name="active" invisible="1" />
@@ -82,7 +91,11 @@
             <search>
                 <field name="name" />
                 <field name="company_id" groups="base.group_multi_company" />
-                <filter name="inactive" string="Archived" domain="[('active', '=', False)]" />
+                <filter
+                    name="inactive"
+                    string="Archived"
+                    domain="[('active', '=', False)]"
+                />
             </search>
         </field>
     </record>
@@ -108,5 +121,4 @@
         action="credit_card_admin_action"
         sequence="47"
     />
-
 </odoo>
