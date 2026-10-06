@@ -1,11 +1,10 @@
 # Copyright (C) 2026 Madooit
 # License AGPL-3 - See http://www.gnu.org/licenses/agpl-3.0.html
 
-from openupgradelib import openupgrade
+from odoo import SUPERUSER_ID, api
 
 
-@openupgrade.migrate()
-def migrate(env, version):
+def migrate(cr, version):
     """Recreate the credit card fee lines of the existing sale orders.
 
     The applied fees are now stored in "credit.card.fee.line", one line per
@@ -14,6 +13,9 @@ def migrate(env, version):
     summed anymore. The lines are synchronized with the payment methods (or
     with the card administrator of the order) and the current invoice plan.
     """
+    if not version:
+        return
+    env = api.Environment(cr, SUPERUSER_ID, {})
     orders = env["sale.order"].search([("credit_card_admin_id", "!=", False)])
     for order in orders:
         order._sync_credit_card_fee_lines()
