@@ -4,10 +4,10 @@
     "license": "AGPL-3",
     "author": "Akretion, Odoo Community Association (OCA)",
     "website": "https://github.com/OCA/sale-workflow",
-    "version": "18.0.4.0.0",
+    "version": "18.0.1.0.0",
     "depends": ["sale_management", "sale_payment_method", "sale_invoice_plan"],
     "data": [
-        "security/sale_credit_card_fee_security.xml",
+        "security/credit_card_fee_security.xml",
         "security/ir.model.access.csv",
         "data/product.xml",
         "views/credit_card_admin_views.xml",
