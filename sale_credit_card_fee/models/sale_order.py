@@ -58,8 +58,11 @@ class SaleOrder(models.Model):
             self._credit_card_fee_base(), percent
         )
         commands = [(5, 0, 0)]
-        for method in card_admins:
-            commands.append((0, 0, {"payment_method_id": method.id, "amount": amount}))
+        # The whole order is charged on the first fee line: the lines added
+        # after it start with no amount at all.
+        amounts = [amount] + [0.0] * (len(card_admins) - 1)
+        for method, value in zip(card_admins, amounts, strict=False):
+            commands.append((0, 0, {"payment_method_id": method.id, "amount": value}))
         self.credit_card_fee_line_ids = commands
 
     def _sync_credit_card_fee_lines(self):
@@ -105,8 +108,9 @@ class SaleOrder(models.Model):
     def _credit_card_fee_default_amount(self):
         """Return the amount the fee lines of the order default to.
 
-        Every fee line defaults to the same amount: the order total, taxes
-        included, plus the credit card fee of the order.
+        The fee lines add up to the amount the order is charged on as a whole:
+        the order total, taxes included, plus the credit card fee of the
+        order. It is the whole of that amount the lines share.
         """
         self.ensure_one()
         percent = sum(self.credit_card_fee_line_ids.mapped("fee_percent"))
@@ -155,9 +159,11 @@ class SaleOrder(models.Model):
         )
         product = self.env.ref("sale_credit_card_fee.product_credit_card_fee")
         for order in self:
-            fee_lines = order.credit_card_fee_line_ids.filtered("sum_fee")
+            fee_lines = order.credit_card_fee_line_ids.filtered(
+                lambda line: line.sum_fee and line.fee_amount
+            )
             lines_fee = sum(fee_lines.mapped("fee_amount"))
-            if not fee_lines or not lines_fee:
+            if not lines_fee:
                 continue
             if plan.exists():
                 if plan.sale_id != order or not plan.credit_card_fee_amount:

@@ -37,7 +37,8 @@ class SaleCreateInvoicePlan(models.TransientModel):
         """Preview the fee of the invoice plan about to be created.
 
         The preview applies the same computation as the sale order fee lines:
-        every fee line is charged on the order total plus the credit card fee.
+        the order total, taxes and credit card fees included, is charged on
+        the first fee line, the ones after it starting with no amount at all.
         """
         for rec in self:
             sale = rec.sale_id
@@ -63,6 +64,6 @@ class SaleCreateInvoicePlan(models.TransientModel):
                 base, rec.credit_card_fee_percent
             )
             rec.credit_card_fee_amount = sum(
-                amount * percent / 100.0 for percent in percents
+                amount * percent / 100.0 for percent in percents[:1]
             )
             rec.amount_plus_fee = base + rec.credit_card_fee_amount

@@ -5,7 +5,7 @@
     "author": "Madooit, Odoo Community Association (OCA)",
     "website": "https://github.com/OCA/sale-workflow",
     "summary": "Sale Card Fee",
-    "version": "18.0.4.0.0",
+    "version": "18.0.4.0.1",
     "depends": ["sale_management", "sale_payment_method", "sale_invoice_plan"],
     "data": [
         "security/ir.model.access.csv",

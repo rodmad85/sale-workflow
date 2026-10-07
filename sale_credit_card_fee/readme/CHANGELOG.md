@@ -1,5 +1,17 @@
 All notable changes to this module will be documented in this file.
 
+## 18.0.4.0.1 (2026-10-07)
+
+- Share the amount of the order between its credit card fee lines: a fee
+  line added to an order that already has one starts with the amount set
+  to zero instead of the whole order total plus the credit card fee.
+- Take the amount given to a fee line from the other fee lines of the
+  order, in proportion to the amount they hold, so the amounts of an
+  order never add up to more than its total. An amount bigger than what
+  the other lines hold is capped to that total.
+- Update the fee preview of the *Create Invoice Plan* wizard and do not
+  invoice a fee line that has no amount.
+
 ## 18.0.4.0.0 (2026-10-06)
 
 - Add the **Amount** (editable, defaulting to the order total plus the

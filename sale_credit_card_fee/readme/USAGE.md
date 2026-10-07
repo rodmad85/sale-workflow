@@ -9,13 +9,18 @@ To use this module, you need to:
    with the payment method name and the fields **Add Fee**,
    **Credit Card Fee Range**, **Fee (%)**, **Amount** and
    **Fee Amount**.
-3. The **Amount** of a row defaults to the order total plus the credit
+3. The **Amount** of the rows adds up to the order total plus the credit
    card fee, and **Fee Amount** is the fee of that row: its **Fee (%)**
-   applied on its **Amount**. The **Amount** is editable, so the fee of a
+   applied on its **Amount**. That whole amount is charged on the first
+   row, so a row added to an order that already has one starts with the
+   **Amount** set to zero. The **Amount** is editable, so the fee of a
    payment method can be charged on another amount, e.g. only part of
-   the order. Once edited, the row shows a **Custom Amount** toggle: the
-   amount stops following the order total and the credit card fees, and
-   switching the toggle off restores the default.
+   the order: whatever a row is given is taken from the other rows, in
+   proportion to the amount they hold, so the amounts never add up to
+   more than the order total and a row cannot hold more than what the
+   other rows leave it. An edited row stops following the order total and
+   the credit card fees, the rows that were not edited share what is left
+   of the new total.
 4. Go to the *Invoice Plan* tab and click *⇒ Create Invoice Plan*. The
    wizard shows the applicable **Fee (%)**, the fee amount and the order
    total including the fee (**Amount + Fee**), previewing the same
