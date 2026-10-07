@@ -34,7 +34,7 @@ def migrate(cr, version):
         "UPDATE sale_order_credit_card_fee_line "
         "SET custom_amount = FALSE WHERE custom_amount IS NULL"
     )
-    orders.credit_card_fee_line_ids._set_default_amount()
+    orders.credit_card_fee_line_ids._check_amounts()
     _recompute(
         env,
         "sale.order.credit.card.fee.line",

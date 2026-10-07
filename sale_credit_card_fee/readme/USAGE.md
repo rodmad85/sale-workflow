@@ -15,12 +15,15 @@ To use this module, you need to:
    row, so a row added to an order that already has one starts with the
    **Amount** set to zero. The **Amount** is editable, so the fee of a
    payment method can be charged on another amount, e.g. only part of
-   the order: whatever a row is given is taken from the other rows, in
-   proportion to the amount they hold, so the amounts never add up to
-   more than the order total and a row cannot hold more than what the
-   other rows leave it. An edited row stops following the order total and
-   the credit card fees, the rows that were not edited share what is left
-   of the new total.
+   the order: the listing is corrected as soon as an amount changes, the
+   amount given to a row is taken from the other rows and the amounts
+   keep adding up to the order total, which is the highest amount they
+   can hold together. An amount that does not fit is capped, and an
+   **Amount** that would bring the rows over that total is refused: the
+   value that does not fit is the one of the last row edited. A row whose
+   **Amount** was edited stops following the order total and the credit
+   card fees, the rows that were not edited share what is left of the new
+   total.
 4. Go to the *Invoice Plan* tab and click *⇒ Create Invoice Plan*. The
    wizard shows the applicable **Fee (%)**, the fee amount and the order
    total including the fee (**Amount + Fee**), previewing the same

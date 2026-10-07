@@ -6,9 +6,13 @@ All notable changes to this module will be documented in this file.
   line added to an order that already has one starts with the amount set
   to zero instead of the whole order total plus the credit card fee.
 - Take the amount given to a fee line from the other fee lines of the
-  order, in proportion to the amount they hold, so the amounts of an
-  order never add up to more than its total. An amount bigger than what
-  the other lines hold is capped to that total.
+  order, so the amounts of an order keep adding up to its total, taxes
+  and credit card fees included. An amount bigger than what is left of
+  that total is capped to it, and the amounts chosen by the user are
+  never taken back from the lines they set.
+- Check the amounts of the fee lines while the order is being edited:
+  the listing is corrected as soon as an amount changes, without
+  waiting for the order to be saved.
 - Update the fee preview of the *Create Invoice Plan* wizard and do not
   invoice a fee line that has no amount.
 

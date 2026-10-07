@@ -65,6 +65,16 @@ class SaleOrder(models.Model):
             commands.append((0, 0, {"payment_method_id": method.id, "amount": value}))
         self.credit_card_fee_line_ids = commands
 
+    @api.onchange("credit_card_fee_line_ids")
+    def _onchange_credit_card_fee_line_ids(self):
+        """Check the amounts of the fee lines as they are changed.
+
+        The amounts the user edits are shared with the other lines of the
+        order right away, and an amount that does not fit in the total of the
+        order is capped to it, without waiting for the order to be saved.
+        """
+        self.credit_card_fee_line_ids._check_amounts()
+
     def _sync_credit_card_fee_lines(self):
         """Keep one fee line per selected card administrator payment method."""
         for order in self:
@@ -86,14 +96,22 @@ class SaleOrder(models.Model):
     def create(self, vals_list):
         orders = super().create(vals_list)
         orders._sync_credit_card_fee_lines()
-        orders.credit_card_fee_line_ids._set_default_amount()
+        orders.credit_card_fee_line_ids._check_amounts()
         return orders
 
     def write(self, vals):
-        res = super().write(vals)
+        if "credit_card_fee_line_ids" in vals:
+            # The amounts that come with the fee lines are the ones the
+            # checks of the module produced, either by the onchange of the
+            # form or by the checks themselves: write them as they are, the
+            # lines edited by the user being the ones flagged as custom.
+            orders = self.with_context(credit_card_fee_sync_amount=True)
+            res = super(SaleOrder, orders).write(vals)
+        else:
+            res = super().write(vals)
         if vals.get("payment_method_ids"):
             self._sync_credit_card_fee_lines()
-        self.credit_card_fee_line_ids._set_default_amount()
+        self.credit_card_fee_line_ids._check_amounts()
         return res
 
     def _credit_card_fee_base(self):
