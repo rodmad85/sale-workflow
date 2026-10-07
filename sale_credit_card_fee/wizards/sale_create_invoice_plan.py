@@ -26,9 +26,7 @@ class SaleCreateInvoicePlan(models.TransientModel):
         "sale_id",
         "sale_id.amount_untaxed",
         "sale_id.amount_tax",
-        "sale_id.amount_total",
         "sale_id.credit_card_fee_line_ids",
-        "sale_id.credit_card_fee_line_ids.sum_fee",
         "sale_id.credit_card_fee_line_ids.fee_range_id",
         "sale_id.credit_card_fee_line_ids.payment_method_id",
         "sale_id.credit_card_fee_line_ids.payment_method_id.fee_line_ids",
@@ -36,15 +34,19 @@ class SaleCreateInvoicePlan(models.TransientModel):
         "num_installment",
     )
     def _compute_credit_card_fee(self):
+        """Preview the fee of the invoice plan about to be created.
+
+        The preview applies the same computation as the sale order fee lines:
+        every fee line is charged on the order total plus the credit card fee.
+        """
         for rec in self:
-            percent = 0.0
             sale = rec.sale_id
-            if sale:
-                rec.amount_plus_fee = sale.amount_untaxed + sale.amount_tax
-            else:
+            if not sale:
                 rec.credit_card_fee_percent = 0.0
                 rec.credit_card_fee_amount = 0.0
+                rec.amount_plus_fee = 0.0
                 continue
+            percents = []
             for line in sale.credit_card_fee_line_ids:
                 fee = line.fee_range_id
                 if not fee and rec.num_installment and line.payment_method_id:
@@ -54,9 +56,13 @@ class SaleCreateInvoicePlan(models.TransientModel):
                         )
                     )[:1]
                 if fee:
-                    percent += fee.fee_percent or 0.0
-            rec.credit_card_fee_percent = percent
-            base = sale.amount_untaxed + sale.amount_tax
-            fee_amount = base * percent / 100.0
-            rec.credit_card_fee_amount = fee_amount
-            rec.amount_plus_fee = base + fee_amount
+                    percents.append(fee.fee_percent or 0.0)
+            rec.credit_card_fee_percent = sum(percents)
+            base = sale._credit_card_fee_base()
+            amount = self.env["sale.order.credit.card.fee.line"]._amount_with_fee(
+                base, rec.credit_card_fee_percent
+            )
+            rec.credit_card_fee_amount = sum(
+                amount * percent / 100.0 for percent in percents
+            )
+            rec.amount_plus_fee = base + rec.credit_card_fee_amount

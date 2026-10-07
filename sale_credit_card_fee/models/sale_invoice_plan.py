@@ -6,7 +6,7 @@ class SaleInvoicePlan(models.Model):
 
     credit_card_fee_percent = fields.Float(
         string="Fee (%)",
-        related="sale_id.credit_card_fee_percent",
+        related="sale_id.credit_card_fee_percent_sum",
     )
     credit_card_fee_amount = fields.Float(
         string="Fee Amount",

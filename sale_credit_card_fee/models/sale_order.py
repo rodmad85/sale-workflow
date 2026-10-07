@@ -18,16 +18,26 @@ class SaleOrder(models.Model):
         string="Card Administrator Fees",
         copy=True,
     )
-    credit_card_fee_percent = fields.Float(
+    credit_card_fee_percent = fields.Char(
         string="Fee (%)",
         compute="_compute_credit_card_fee",
         store=True,
         readonly=True,
         copy=False,
+        help="Fee of every credit card of the order, separated by commas.",
+    )
+    credit_card_fee_percent_sum = fields.Float(
+        string="Fee (%) Sum",
+        compute="_compute_credit_card_fee",
+        store=True,
+        readonly=True,
+        copy=False,
+        help="Sum of the fees of every credit card of the order.",
     )
     credit_card_fee_amount = fields.Monetary(
         compute="_compute_amounts",
         store=True,
+        help="Sum of the fee amount of the credit card fee lines.",
     )
     credit_card_amount_plus_fee = fields.Monetary(
         string="Amount + Fee",
@@ -38,9 +48,18 @@ class SaleOrder(models.Model):
     @api.onchange("payment_method_ids")
     def _onchange_payment_method_ids(self):
         card_admins = self.payment_method_ids.filtered("credit_card_admin")
+        percent = sum(
+            line.fee_percent
+            for line in self.credit_card_fee_line_ids.filtered(
+                lambda line, admins=card_admins: line.payment_method_id in admins
+            )
+        )
+        amount = self.env["sale.order.credit.card.fee.line"]._amount_with_fee(
+            self._credit_card_fee_base(), percent
+        )
         commands = [(5, 0, 0)]
         for method in card_admins:
-            commands.append((0, 0, {"payment_method_id": method.id}))
+            commands.append((0, 0, {"payment_method_id": method.id, "amount": amount}))
         self.credit_card_fee_line_ids = commands
 
     def _sync_credit_card_fee_lines(self):
@@ -64,24 +83,47 @@ class SaleOrder(models.Model):
     def create(self, vals_list):
         orders = super().create(vals_list)
         orders._sync_credit_card_fee_lines()
+        orders.credit_card_fee_line_ids._set_default_amount()
         return orders
 
     def write(self, vals):
         res = super().write(vals)
         if vals.get("payment_method_ids"):
             self._sync_credit_card_fee_lines()
+        self.credit_card_fee_line_ids._set_default_amount()
         return res
+
+    def _credit_card_fee_base(self):
+        """Return the order amount the credit card fees are charged on.
+
+        The fees are charged on the taxed total without them, so the base is
+        the same for every fee line and does not depend on the fee itself.
+        """
+        self.ensure_one()
+        return self.amount_untaxed + self.amount_tax
+
+    def _credit_card_fee_default_amount(self):
+        """Return the amount the fee lines of the order default to.
+
+        Every fee line defaults to the same amount: the order total, taxes
+        included, plus the credit card fee of the order.
+        """
+        self.ensure_one()
+        percent = sum(self.credit_card_fee_line_ids.mapped("fee_percent"))
+        return self.env["sale.order.credit.card.fee.line"]._amount_with_fee(
+            self._credit_card_fee_base(), percent
+        )
 
     @api.depends(
         "credit_card_fee_line_ids",
         "credit_card_fee_line_ids.fee_percent",
     )
     def _compute_credit_card_fee(self):
+        fee_lines = self.env["sale.order.credit.card.fee.line"]
         for order in self:
-            percent = sum(
-                (line.fee_percent or 0.0) for line in order.credit_card_fee_line_ids
-            )
-            order.credit_card_fee_percent = percent
+            percents = order.credit_card_fee_line_ids.mapped("fee_percent")
+            order.credit_card_fee_percent = fee_lines._format_fee_percents(percents)
+            order.credit_card_fee_percent_sum = sum(percents)
 
     @api.depends(
         "order_line.price_subtotal",
@@ -92,22 +134,18 @@ class SaleOrder(models.Model):
         "payment_term_id",
         "credit_card_fee_line_ids",
         "credit_card_fee_line_ids.sum_fee",
-        "credit_card_fee_line_ids.fee_percent",
+        "credit_card_fee_line_ids.fee_amount",
     )
     def _compute_amounts(self):
         res = super()._compute_amounts()
         for order in self:
-            base = order.amount_untaxed + order.amount_tax
-            fee = 0.0
-            fee_to_add = 0.0
-            for line in order.credit_card_fee_line_ids:
-                line_fee = base * (line.fee_percent or 0.0) / 100.0
-                fee += line_fee
-                if line.sum_fee:
-                    fee_to_add += line_fee
+            fee = sum(order.credit_card_fee_line_ids.mapped("fee_amount"))
+            fee_to_add = sum(
+                order.credit_card_fee_line_ids.filtered("sum_fee").mapped("fee_amount")
+            )
             order.credit_card_fee_amount = fee
             order.amount_total += fee_to_add
-            order.credit_card_amount_plus_fee = base + fee
+            order.credit_card_amount_plus_fee = order._credit_card_fee_base() + fee
         return res
 
     def _create_invoices(self, grouped=False, final=False, date=None):
@@ -118,7 +156,8 @@ class SaleOrder(models.Model):
         product = self.env.ref("sale_credit_card_fee.product_credit_card_fee")
         for order in self:
             fee_lines = order.credit_card_fee_line_ids.filtered("sum_fee")
-            if not fee_lines or not order.credit_card_fee_percent:
+            lines_fee = sum(fee_lines.mapped("fee_amount"))
+            if not fee_lines or not lines_fee:
                 continue
             if plan.exists():
                 if plan.sale_id != order or not plan.credit_card_fee_amount:
@@ -154,8 +193,8 @@ class SaleOrder(models.Model):
                                 ),
                                 "quantity": 1,
                                 "price_unit": fee_amount
-                                * fee_line.fee_percent
-                                / order.credit_card_fee_percent,
+                                * fee_line.fee_amount
+                                / lines_fee,
                                 "tax_ids": [(5, 0, 0)],
                             },
                         )

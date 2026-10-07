@@ -27,6 +27,6 @@ class AccountMove(models.Model):
     def _compute_credit_card_fee(self):
         for move in self:
             order = move.invoice_line_ids.sale_line_ids.order_id[:1]
-            move.credit_card_fee_percent = order.credit_card_fee_percent or 0.0
+            move.credit_card_fee_percent = order.credit_card_fee_percent_sum or 0.0
             move.credit_card_fee_amount = order.credit_card_fee_amount or 0.0
             move.credit_card_amount_plus_fee = order.credit_card_amount_plus_fee or 0.0

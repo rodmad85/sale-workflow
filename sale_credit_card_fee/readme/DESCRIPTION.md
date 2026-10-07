@@ -7,8 +7,9 @@ It allows you to:
   table per installment range directly in the payment method form
   (**Fee Ranges** tab).
 - Define, on the sale order, the fee configuration for each selected
-  payment method marked as Card Administrator: **Add Fee** and
-  **Credit Card Fee Range**.
+  payment method marked as Card Administrator: **Add Fee**,
+  **Credit Card Fee Range**, the **Amount** the fee is charged on and the
+  resulting **Fee Amount**.
 - Optionally sum the credit card fee to the sale order total.
 - Include the credit card fee in each installment invoice,
   proportionally to the planned amount.

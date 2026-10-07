@@ -42,6 +42,25 @@ msgstr ""
 "do pedido."
 
 #. module: sale_credit_card_fee
+#: model:ir.model.fields,field_description:sale_credit_card_fee.field_sale_order_credit_card_fee_line__amount
+#: model_terms:ir.ui.view,arch_db:sale_credit_card_fee.view_order_form_inherit_card_fee
+msgid "Amount"
+msgstr "Valor"
+
+#. module: sale_credit_card_fee
+#: model:ir.model.fields,help:sale_credit_card_fee.field_sale_order_credit_card_fee_line__amount
+msgid ""
+"Amount the fee of this payment method is charged on. It defaults to the "
+"order total plus the credit card fee, follows the order until it is edited "
+"and can be edited to charge the fee of this payment method on another "
+"amount."
+msgstr ""
+"Valor sobre o qual a taxa deste método de pagamento é cobrada. Por padrão é "
+"o valor total do pedido mais a taxa de cartão de crédito, acompanha o pedido "
+"até ser editado e pode ser editado para cobrar a taxa deste método de "
+"pagamento sobre outro valor."
+
+#. module: sale_credit_card_fee
 #: model:ir.model.fields,field_description:sale_credit_card_fee.field_sale_order__credit_card_amount_plus_fee
 #: model:ir.model.fields,field_description:sale_credit_card_fee.field_sale_create_invoice_plan__amount_plus_fee
 #: model:ir.model.fields,field_description:sale_credit_card_fee.field_account_move__credit_card_amount_plus_fee
@@ -106,7 +125,7 @@ msgid "Credit card fee percentage for this installment range"
 msgstr "Percentual da taxa de cartão de crédito para esta faixa de parcelas"
 
 #. module: sale_credit_card_fee
-#: model:ir.model.fields,field_description:sale_credit_card_fee.field_payment_method__credit_card_admin
+#: model:ir.model.fields,help:sale_credit_card_fee.field_payment_method__credit_card_admin
 msgid ""
 "Mark this payment method as a credit card administrator to configure the "
 "credit card fee ranges used in sale orders."
@@ -114,6 +133,25 @@ msgstr ""
 "Marque este método de pagamento como administradora de cartão para "
 "configurar as faixas de taxas de cartão de crédito usadas nos pedidos de "
 "venda."
+
+#. module: sale_credit_card_fee
+#: model:ir.model.fields,help:sale_credit_card_fee.field_sale_order__credit_card_fee_percent
+msgid "Fee of every credit card of the order, separated by commas."
+msgstr "Taxa de cada cartão de crédito do pedido, separadas por vírgulas."
+
+#. module: sale_credit_card_fee
+#: model:ir.model.fields,field_description:sale_credit_card_fee.field_sale_order_credit_card_fee_line__custom_amount
+msgid "Custom Amount"
+msgstr "Valor Personalizado"
+
+#. module: sale_credit_card_fee
+#: model:ir.model.fields,help:sale_credit_card_fee.field_sale_order_credit_card_fee_line__custom_amount
+msgid ""
+"Keep the amount of this line when the order total or the credit card fees "
+"change."
+msgstr ""
+"Mantém o valor desta linha quando o valor total do pedido ou as taxas de "
+"cartão de crédito mudarem."
 
 #. module: sale_credit_card_fee
 #: model:ir.model.fields,field_description:sale_credit_card_fee.field_sale_order__credit_card_fee_percent
@@ -128,11 +166,27 @@ msgid "Fee (%)"
 msgstr "Taxa (%)"
 
 #. module: sale_credit_card_fee
+#: model:ir.model.fields,field_description:sale_credit_card_fee.field_sale_order__credit_card_fee_percent_sum
+msgid "Fee (%) Sum"
+msgstr "Soma das Taxas (%)"
+
+#. module: sale_credit_card_fee
+#: model:ir.model.fields,help:sale_credit_card_fee.field_sale_order__credit_card_fee_percent_sum
+msgid "Sum of the fees of every credit card of the order."
+msgstr "Soma das taxas de cada cartão de crédito do pedido."
+
+#. module: sale_credit_card_fee
 #: model:ir.model.fields,field_description:sale_credit_card_fee.field_sale_invoice_plan__credit_card_fee_amount
+#: model:ir.model.fields,field_description:sale_credit_card_fee.field_sale_order_credit_card_fee_line__fee_amount
 #: model_terms:ir.ui.view,arch_db:sale_credit_card_fee.view_order_form_inherit_card_fee
 #: model_terms:ir.ui.view,arch_db:sale_credit_card_fee.view_move_form_inherit_card_fee
 msgid "Fee Amount"
 msgstr "Valor da Taxa"
+
+#. module: sale_credit_card_fee
+#: model:ir.model.fields,help:sale_credit_card_fee.field_sale_order_credit_card_fee_line__fee_amount
+msgid "Fee of this payment method, charged on the amount."
+msgstr "Taxa deste método de pagamento, cobrada sobre o valor."
 
 #. module: sale_credit_card_fee
 #: model_terms:ir.ui.view,arch_db:sale_credit_card_fee.view_payment_method_form_inherit_card_fee
@@ -162,6 +216,12 @@ msgid "Payment Method"
 msgstr "Método de Pagamento"
 
 #. module: sale_credit_card_fee
+#: model:ir.model.fields,field_description:sale_credit_card_fee.field_sale_create_invoice_plan__currency_id
+#: model:ir.model.fields,field_description:sale_credit_card_fee.field_sale_order_credit_card_fee_line__currency_id
+msgid "Currency"
+msgstr "Moeda"
+
+#. module: sale_credit_card_fee
 #: model:ir.model.fields,field_description:sale_credit_card_fee.field_sale_order__payment_method_ids
 #: model:ir.model.fields,field_description:sale_credit_card_fee.field_account_move__payment_method_ids
 msgid "Payment Methods"
@@ -179,9 +239,19 @@ msgid "Sale Order"
 msgstr "Pedido de Venda"
 
 #. module: sale_credit_card_fee
+#: model:ir.model,name:sale_credit_card_fee.model_sale_order_line
+msgid "Sales Order Line"
+msgstr "Linha do Pedido de Venda"
+
+#. module: sale_credit_card_fee
 #: model:ir.model,name:sale_credit_card_fee.model_sale_order_credit_card_fee_line
 msgid "Sale Order Credit Card Fee Line"
 msgstr "Linha de Taxa de Cartão de Crédito do Pedido de Venda"
+
+#. module: sale_credit_card_fee
+#: model:ir.model.fields,help:sale_credit_card_fee.field_sale_order__credit_card_fee_amount
+msgid "Sum of the fee amount of the credit card fee lines."
+msgstr "Soma do valor da taxa das linhas de taxa de cartão de crédito."
 
 #. module: sale_credit_card_fee
 #: model:ir.model.fields,help:sale_credit_card_fee.field_sale_order__credit_card_amount_plus_fee

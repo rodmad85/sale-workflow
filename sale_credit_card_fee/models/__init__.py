@@ -4,3 +4,4 @@ from . import payment_method
 from . import sale_invoice_plan
 from . import sale_order
 from . import sale_order_credit_card_fee_line
+from . import sale_order_line

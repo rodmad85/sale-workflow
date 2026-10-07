@@ -22,6 +22,19 @@
                                     string="Credit Card Fee Range"
                                 />
                                 <field name="fee_percent" string="Fee (%)" />
+                                <field name="amount" string="Amount" />
+                                <field
+                                    name="fee_amount"
+                                    string="Fee Amount"
+                                    readonly="1"
+                                />
+                                <field
+                                    name="custom_amount"
+                                    string="Custom Amount"
+                                    widget="boolean_toggle"
+                                    invisible="not custom_amount"
+                                    help="Amount edited: it no longer follows the order."
+                                />
                             </list>
                         </field>
                     </group>
