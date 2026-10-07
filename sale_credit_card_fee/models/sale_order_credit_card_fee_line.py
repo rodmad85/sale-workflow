@@ -192,23 +192,6 @@ class SaleOrderCreditCardFeeLine(models.Model):
                     list(zip(edited, self._share_amount(edited, total), strict=False))
                 )
 
-    def _cap_amounts(self):
-        """Refuse the amounts that do not fit in the total of the order.
-
-        The amounts that come with the fee lines are the ones the checks of
-        the module produced, so only the total of the order is checked here:
-        the amounts that do not fit in it share what is left of it, equally.
-        """
-        for order in self.sale_order_id:
-            lines = order.credit_card_fee_line_ids
-            if not lines:
-                continue
-            total = order._credit_card_fee_default_amount()
-            if sum(lines.mapped("amount")) <= total:
-                continue
-            values = self._share_amount(lines, total)
-            self._write_amount(list(zip(lines, values, strict=False)))
-
     @api.model_create_multi
     def create(self, vals_list):
         lines = super().create(vals_list)

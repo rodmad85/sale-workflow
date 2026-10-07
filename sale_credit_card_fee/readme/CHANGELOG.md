@@ -15,6 +15,10 @@ All notable changes to this module will be documented in this file.
 - Check the amounts of the fee lines while the order is being edited: the
   listing is corrected as soon as an amount changes, without waiting for
   the order to be saved.
+- Keep the technical fields of those checks in the listing of the fee lines,
+  hidden, so that the web client sends them back to the server with the
+  amounts and the order is settled even if a listing is edited by another
+  client.
 - Update the fee preview of the *Create Invoice Plan* wizard and do not
   invoice a fee line that has no amount.
 

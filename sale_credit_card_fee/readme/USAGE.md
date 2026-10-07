@@ -23,7 +23,8 @@ To use this module, you need to:
    the other rows share the difference equally between them, none of them
    going below zero, so the **Amount** of the rows never adds up to more
    than the total of the order. An amount bigger than that total is
-   refused.
+   refused. Setting the **Amount** of a row to zero gives the whole total
+   back to the other row when there is only one left.
 5. A row whose **Amount** was edited stops following the order total and
    the credit card fees: when the order changes, the rows that were not
    edited share the new total.

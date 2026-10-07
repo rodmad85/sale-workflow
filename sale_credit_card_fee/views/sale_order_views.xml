@@ -28,6 +28,11 @@
                                     string="Fee Amount"
                                     readonly="1"
                                 />
+                                <!-- technical fields of the checks: the
+                                     client sends them back and forth with
+                                     the amount of the row -->
+                                <field name="custom_amount" column_invisible="1" />
+                                <field name="edited_amount" column_invisible="1" />
                             </list>
                         </field>
                     </group>

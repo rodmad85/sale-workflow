@@ -76,7 +76,6 @@ class SaleOrder(models.Model):
         """
         lines = self.credit_card_fee_line_ids
         lines._check_amounts(edited=lines.filtered("edited_amount"))
-        lines.write({"edited_amount": False})
 
     def _sync_credit_card_fee_lines(self):
         """Keep one fee line per selected card administrator payment method."""
@@ -107,11 +106,12 @@ class SaleOrder(models.Model):
             # The amounts that come with the fee lines are the ones the
             # checks of the module produced, either by the onchange of the
             # form or by the checks themselves: write them as they are, the
-            # lines edited by the user being the ones flagged as custom, and
-            # only check that they fit in the total of the order.
+            # lines edited by the user being the ones flagged as custom.
             orders = self.with_context(credit_card_fee_sync_amount=True)
             res = super(SaleOrder, orders).write(vals)
-            self.credit_card_fee_line_ids._cap_amounts()
+            lines = self.credit_card_fee_line_ids
+            lines._check_amounts(edited=lines.filtered("edited_amount") or None)
+            lines.write({"edited_amount": False})
             return res
         res = super().write(vals)
         if vals.get("payment_method_ids"):

@@ -1,3 +1,5 @@
+from lxml import etree
+
 from odoo.tests import Form
 
 from odoo.addons.account.tests.common import AccountTestInvoicingCommon
@@ -425,6 +427,26 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
         line = order.credit_card_fee_line_ids.new({"amount": 50.0})
         line._onchange_amount()
         self.assertTrue(line.custom_amount)
+        self.assertTrue(line.edited_amount)
+
+    def test_listing_sends_the_technical_fields_to_the_client(self):
+        """The checks need those fields in the listing of the fee lines.
+
+        The web client only sends back to the server what the view of the
+        listing holds, so the fields telling which amounts were edited have to
+        be part of it to reach the checks of the listing.
+        """
+        view = self.env["sale.order"].get_view(
+            view_id=self.env.ref(
+                "sale_credit_card_fee.view_order_form_inherit_card_fee"
+            ).id
+        )
+        listing = etree.fromstring(view["arch"]).xpath(
+            "//field[@name='credit_card_fee_line_ids']//list//field"
+        )
+        names = [node.get("name") for node in listing]
+        self.assertIn("custom_amount", names)
+        self.assertIn("edited_amount", names)
 
     def test_onchange_amount_is_shared_with_the_other_lines(self):
         order = self._create_sale_order([self.payment_method, self.second_method])
@@ -445,6 +467,18 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
         self._edit_fee_amount(order, 1, 1000.0)
         self.assertEqual(second.amount, order.currency_id.round(total))
         self.assertEqual(first.amount, 0.0)
+        self._assert_amounts_add_up_to_the_total(order)
+
+    def test_onchange_amount_zeroed_gives_the_total_to_the_other_line(self):
+        order = self._create_sale_order([self.payment_method, self.second_method])
+        order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
+        total = order._credit_card_fee_default_amount()
+        first, second = order.credit_card_fee_line_ids
+        self._edit_fee_amount(order, 1, 50.0)
+        self._edit_fee_amount(order, 1, 0.0)
+        # Zeroing a line gives the whole total back to the other one.
+        self.assertEqual(second.amount, 0.0)
+        self.assertEqual(first.amount, order.currency_id.round(total))
         self._assert_amounts_add_up_to_the_total(order)
 
     def test_onchange_amount_of_the_line_holding_the_order_shares_it(self):
