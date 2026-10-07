@@ -41,18 +41,27 @@ class SaleOrderCreditCardFeeLine(models.Model):
     )
     amount = fields.Monetary(
         currency_field="currency_id",
-        help="Amount the fee of this payment method is charged on. It "
-        "defaults to the order total plus the credit card fee and follows "
-        "the order until it is edited. The amount of a line added to an "
-        "order that already has one starts at zero: what a line is given is "
-        "taken from the lines that still follow the order, so the amounts of "
-        "an order keep adding up to its total, and an amount that does not "
-        "fit in that total is capped to it.",
+        help="Amount the fee of this payment method is charged on. The fee "
+        "is a part of that amount, so the amounts of the lines of an order "
+        "add up to the total of the order, taxes and credit card fees "
+        "included. The whole of that amount is charged on the first line by "
+        "default and a line added to an order that already has one starts "
+        "with no amount at all. Editing it gives that amount to the line, "
+        "which is then taken from the lines that still follow the order.",
     )
     custom_amount = fields.Boolean(
         default=False,
         help="Keep the amount of this line when the order total or the "
         "credit card fees change.",
+    )
+    edited_amount = fields.Boolean(
+        string="Amount Edited",
+        store=False,
+        copy=False,
+        default=False,
+        help="Technical field set while the user edits the amount of this "
+        "line, so that the checks of the listing take the difference from "
+        "the other lines of the order.",
     )
     fee_amount = fields.Monetary(
         currency_field="currency_id",
@@ -69,26 +78,64 @@ class SaleOrderCreditCardFeeLine(models.Model):
         )
 
     @api.model
-    def _amount_with_fee(self, amount, percent):
-        """Return an amount increased by the fee of a percentage."""
-        return amount + amount * (percent or 0.0) / 100.0
+    def _amount_of_net(self, net, percent):
+        """Return the amount leaving ``net`` of the order with that fee.
+
+        The customer pays that amount with its card and the fee is a part of
+        it, so the order only receives the rest.
+        """
+        ratio = 1.0 - (percent or 0.0) / 100.0
+        if ratio <= 0.0:
+            return net
+        return net / ratio
 
     @api.model
-    def _amount_within_total(self, lines, amount):
-        """Return the amount the given lines can hold of the order total.
+    def _share_amount(self, lines, amount):
+        """Return the amounts of ``lines`` holding ``amount`` together.
 
-        The lines take what is left of the total of the order once the lines
-        whose amount was edited keep theirs, so that the amounts of the lines
-        of an order never add up to more than that total.
+        What the lines have to gain or to give is shared equally between
+        them, so every line gets the same share of the change:
+
+        - a change taking them below zero is taken from the lines that hold
+          enough of it, the smallest ones first, and what is left is shared
+          again with the lines that can still give their share;
+        - the rounding of the currency is left to the last line.
         """
-        order = lines[:1].sale_order_id
-        kept = sum(
-            (order.credit_card_fee_line_ids - lines)
-            .filtered("custom_amount")
-            .mapped("amount")
-        )
-        room = max(order._credit_card_fee_default_amount() - kept, 0.0)
-        return max(min(amount, room / len(lines)), 0.0)
+        if not lines:
+            return []
+        current = sum(lines.mapped("amount"))
+        difference = amount - current
+        if not difference:
+            return list(lines.mapped("amount"))
+        currency = lines[:1].currency_id
+        if difference > 0.0:
+            share = currency.round(difference / len(lines))
+            values = [line.amount + share for line in lines[:-1]]
+            values.append(lines[-1].amount + difference - share * (len(lines) - 1))
+            return values
+        left = -difference
+        values = {line: line.amount for line in lines}
+        # the smallest amounts are the ones running out of their share first
+        pending = lines.sorted("amount")
+        for line in pending:
+            if not left or not pending:
+                break
+            share = min(line.amount, currency.round(left / len(pending)))
+            values[line] = line.amount - share
+            left -= share
+            pending = pending - line
+        return [values[line] for line in lines]
+
+    @api.model
+    def _amount_within_order(self, lines, amount):
+        """Return the amount the given lines can hold of the order.
+
+        The amounts of the lines of an order add up to the total of the order,
+        taxes and credit card fees included, and the other lines can give up
+        everything they hold, so a line can never hold more than that total.
+        """
+        total = lines[:1].sale_order_id._credit_card_fee_default_amount()
+        return max(min(amount, total / max(len(lines), 1)), 0.0)
 
     def _write_amount(self, pairs):
         """Write the given ``(line, amount)`` pairs from the module itself.
@@ -103,40 +150,64 @@ class SaleOrderCreditCardFeeLine(models.Model):
                     {"amount": value}
                 )
 
-    def _check_amounts(self):
-        """Make the amounts of the lines add up to the total of the order.
+    def _check_amounts(self, edited=None):
+        """Keep the amounts of the lines adding up to the total of the order.
 
-        The amounts of the fee lines of an order add up to the amount the
-        order is charged on as a whole, taxes and credit card fees included:
+        The amounts of the fee lines of an order add up to the total of the
+        order, taxes and credit card fees included:
 
-        - the lines whose amount was edited keep it, and when they hold more
-          than the order together the smallest ones are kept: the amount
-          edited last, which is the one that went over, is cut back;
-        - what is left of the total goes to the first line that still follows
-          the order, the other ones being left with no amount at all.
+        - when the user edits an amount, the other lines share what is left
+          of that total equally, so the amounts can never add up to more than
+          it;
+        - when the order changes, the lines whose amount was edited keep it
+          and what is left of the total goes to the first line that still
+          follows the order, the other ones being left with no amount.
         """
         for order in self.sale_order_id:
             lines = order.credit_card_fee_line_ids
             if not lines:
                 continue
             total = order._credit_card_fee_default_amount()
-            edited = lines.filtered("custom_amount")
-            edited_amount = sum(edited.mapped("amount"))
-            pairs = []
-            if edited_amount > total:
-                # The amounts chosen hold more than the order: what is left of
-                # it is shared, the smallest amounts first.
-                left = total
-                for line in edited.sorted("amount"):
-                    pairs.append((line, min(line.amount, left)))
-                    left = max(left - line.amount, 0.0)
-                edited_amount = total - left
-            following = lines - edited
-            if following:
-                rest = max(total - edited_amount, 0.0)
+            if edited:
+                # The user chose amounts: the other lines share what is left
+                # of the total of the order between them, equally.
+                others = lines - edited
+                values = self._share_amount(
+                    others, total - sum(edited.mapped("amount"))
+                )
+                self._write_amount(list(zip(others, values, strict=False)))
+            else:
+                # Nothing was just edited: the amounts chosen by the user are
+                # kept and the first line still following the order takes
+                # what is left of the total of the order.
+                edited = lines.filtered("custom_amount")
+                following = lines - edited
+                rest = max(total - sum(edited.mapped("amount")), 0.0)
                 values = [rest] + [0.0] * (len(following) - 1)
-                pairs += list(zip(following, values, strict=False))
-            self._write_amount(pairs)
+                self._write_amount(list(zip(following, values, strict=False)))
+            if sum(edited.mapped("amount")) > total:
+                # The amounts chosen do not fit in the total of the order:
+                # they share what is left of it, equally.
+                self._write_amount(
+                    list(zip(edited, self._share_amount(edited, total), strict=False))
+                )
+
+    def _cap_amounts(self):
+        """Refuse the amounts that do not fit in the total of the order.
+
+        The amounts that come with the fee lines are the ones the checks of
+        the module produced, so only the total of the order is checked here:
+        the amounts that do not fit in it share what is left of it, equally.
+        """
+        for order in self.sale_order_id:
+            lines = order.credit_card_fee_line_ids
+            if not lines:
+                continue
+            total = order._credit_card_fee_default_amount()
+            if sum(lines.mapped("amount")) <= total:
+                continue
+            values = self._share_amount(lines, total)
+            self._write_amount(list(zip(lines, values, strict=False)))
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -149,10 +220,12 @@ class SaleOrderCreditCardFeeLine(models.Model):
         """Flag an amount edited by the user as chosen by hand.
 
         The line then stops following the order: what it gains is taken from
-        the other lines and what it gives up goes to the line that still
-        follows the order.
+        the other lines and what it gives up goes to them, shared equally.
+        The marker tells the onchange of the order which line the user has
+        just edited, so that only that one keeps its amount.
         """
         self.custom_amount = True
+        self.edited_amount = True
 
     def write(self, vals):
         if "amount" in vals and not self.env.context.get("credit_card_fee_sync_amount"):
@@ -167,7 +240,7 @@ class SaleOrderCreditCardFeeLine(models.Model):
                 super(SaleOrderCreditCardFeeLine, edited).write(
                     {
                         **vals,
-                        "amount": self._amount_within_total(edited, vals["amount"]),
+                        "amount": self._amount_within_order(edited, vals["amount"]),
                     }
                 )
                 moved = edited.filtered(
@@ -175,7 +248,7 @@ class SaleOrderCreditCardFeeLine(models.Model):
                 )
                 if moved:
                     moved.custom_amount = True
-                    self._check_amounts()
+                    self._check_amounts(edited=moved)
             return True
         res = super().write(vals)
         if "fee_range_id" in vals:

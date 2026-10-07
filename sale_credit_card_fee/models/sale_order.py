@@ -48,18 +48,19 @@ class SaleOrder(models.Model):
     @api.onchange("payment_method_ids")
     def _onchange_payment_method_ids(self):
         card_admins = self.payment_method_ids.filtered("credit_card_admin")
-        percent = sum(
-            line.fee_percent
-            for line in self.credit_card_fee_line_ids.filtered(
-                lambda line, admins=card_admins: line.payment_method_id in admins
-            )
+        lines = self.env["sale.order.credit.card.fee.line"]
+        percent = next(
+            (
+                line.fee_percent
+                for line in self.credit_card_fee_line_ids
+                if line.payment_method_id in card_admins
+            ),
+            0.0,
         )
-        amount = self.env["sale.order.credit.card.fee.line"]._amount_with_fee(
-            self._credit_card_fee_base(), percent
-        )
-        commands = [(5, 0, 0)]
         # The whole order is charged on the first fee line: the lines added
         # after it start with no amount at all.
+        amount = lines._amount_of_net(self._credit_card_fee_base(), percent)
+        commands = [(5, 0, 0)]
         amounts = [amount] + [0.0] * (len(card_admins) - 1)
         for method, value in zip(card_admins, amounts, strict=False):
             commands.append((0, 0, {"payment_method_id": method.id, "amount": value}))
@@ -69,11 +70,13 @@ class SaleOrder(models.Model):
     def _onchange_credit_card_fee_line_ids(self):
         """Check the amounts of the fee lines as they are changed.
 
-        The amounts the user edits are shared with the other lines of the
-        order right away, and an amount that does not fit in the total of the
-        order is capped to it, without waiting for the order to be saved.
+        The amount the user just edited is kept and the other lines share
+        what is left of the total of the order between them, equally, without
+        waiting for the order to be saved.
         """
-        self.credit_card_fee_line_ids._check_amounts()
+        lines = self.credit_card_fee_line_ids
+        lines._check_amounts(edited=lines.filtered("edited_amount"))
+        lines.write({"edited_amount": False})
 
     def _sync_credit_card_fee_lines(self):
         """Keep one fee line per selected card administrator payment method."""
@@ -104,11 +107,13 @@ class SaleOrder(models.Model):
             # The amounts that come with the fee lines are the ones the
             # checks of the module produced, either by the onchange of the
             # form or by the checks themselves: write them as they are, the
-            # lines edited by the user being the ones flagged as custom.
+            # lines edited by the user being the ones flagged as custom, and
+            # only check that they fit in the total of the order.
             orders = self.with_context(credit_card_fee_sync_amount=True)
             res = super(SaleOrder, orders).write(vals)
-        else:
-            res = super().write(vals)
+            self.credit_card_fee_line_ids._cap_amounts()
+            return res
+        res = super().write(vals)
         if vals.get("payment_method_ids"):
             self._sync_credit_card_fee_lines()
         self.credit_card_fee_line_ids._check_amounts()
@@ -124,17 +129,17 @@ class SaleOrder(models.Model):
         return self.amount_untaxed + self.amount_tax
 
     def _credit_card_fee_default_amount(self):
-        """Return the amount the fee lines of the order default to.
+        """Return the amount the fee lines of the order add up to by default.
 
-        The fee lines add up to the amount the order is charged on as a whole:
-        the order total, taxes included, plus the credit card fee of the
-        order. It is the whole of that amount the lines share.
+        The fee lines add up to the total of the order, taxes and credit card
+        fees included, which is what they leave of the order once their own
+        fee is taken. By default the whole of that amount is charged on the
+        first fee line, the other ones having no amount at all.
         """
         self.ensure_one()
-        percent = sum(self.credit_card_fee_line_ids.mapped("fee_percent"))
-        return self.env["sale.order.credit.card.fee.line"]._amount_with_fee(
-            self._credit_card_fee_base(), percent
-        )
+        lines = self.env["sale.order.credit.card.fee.line"]
+        percent = self.credit_card_fee_line_ids[:1].fee_percent
+        return lines._amount_of_net(self._credit_card_fee_base(), percent)
 
     @api.depends(
         "credit_card_fee_line_ids",

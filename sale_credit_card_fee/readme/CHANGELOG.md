@@ -2,17 +2,19 @@ All notable changes to this module will be documented in this file.
 
 ## 18.0.4.0.1 (2026-10-07)
 
-- Share the amount of the order between its credit card fee lines: a fee
-  line added to an order that already has one starts with the amount set
-  to zero instead of the whole order total plus the credit card fee.
-- Take the amount given to a fee line from the other fee lines of the
-  order, so the amounts of an order keep adding up to its total, taxes
-  and credit card fees included. An amount bigger than what is left of
-  that total is capped to it, and the amounts chosen by the user are
-  never taken back from the lines they set.
-- Check the amounts of the fee lines while the order is being edited:
-  the listing is corrected as soon as an amount changes, without
-  waiting for the order to be saved.
+- Share the amount of the order between its credit card fee lines: the fee
+  of a card is a part of the amount charged on it, so the amounts of the
+  lines add up to the total of the order, taxes and credit card fees
+  included. The whole of that amount is charged on the first line by
+  default, and a line added to an order that already has one starts with
+  no amount at all.
+- Keep that total when the user edits an amount: the amount just edited is
+  kept as it was typed and the other lines share the difference equally
+  between them, none of them going below zero, so the amounts can never
+  add up to more than the total of the order.
+- Check the amounts of the fee lines while the order is being edited: the
+  listing is corrected as soon as an amount changes, without waiting for
+  the order to be saved.
 - Update the fee preview of the *Create Invoice Plan* wizard and do not
   invoice a fee line that has no amount.
 

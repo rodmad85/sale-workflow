@@ -9,29 +9,32 @@ To use this module, you need to:
    with the payment method name and the fields **Add Fee**,
    **Credit Card Fee Range**, **Fee (%)**, **Amount** and
    **Fee Amount**.
-3. The **Amount** of the rows adds up to the order total plus the credit
-   card fee, and **Fee Amount** is the fee of that row: its **Fee (%)**
-   applied on its **Amount**. That whole amount is charged on the first
-   row, so a row added to an order that already has one starts with the
-   **Amount** set to zero. The **Amount** is editable, so the fee of a
-   payment method can be charged on another amount, e.g. only part of
-   the order: the listing is corrected as soon as an amount changes, the
-   amount given to a row is taken from the other rows and the amounts
-   keep adding up to the order total, which is the highest amount they
-   can hold together. An amount that does not fit is capped, and an
-   **Amount** that would bring the rows over that total is refused: the
-   value that does not fit is the one of the last row edited. A row whose
-   **Amount** was edited stops following the order total and the credit
-   card fees, the rows that were not edited share what is left of the new
-   total.
-4. Go to the *Invoice Plan* tab and click *⇒ Create Invoice Plan*. The
+3. The **Amount** of a row is the part of the order paid with that card:
+   its fee is a part of that amount, so the **Amount** of the rows adds up
+   to the total of the order, taxes and credit card fees included. The
+   whole of it is charged on the first row, and a row added to an order
+   that already has one starts with the **Amount** set to zero.
+   **Fee Amount** is the fee of that row: its **Fee (%)** applied on its
+   **Amount**.
+4. The **Amount** is editable, so the fee of a payment method can be
+   charged on another amount, e.g. only part of the order. The listing is
+   corrected as soon as an amount changes, without waiting for the order
+   to be saved: the amount just edited is kept exactly as it was typed and
+   the other rows share the difference equally between them, none of them
+   going below zero, so the **Amount** of the rows never adds up to more
+   than the total of the order. An amount bigger than that total is
+   refused.
+5. A row whose **Amount** was edited stops following the order total and
+   the credit card fees: when the order changes, the rows that were not
+   edited share the new total.
+6. Go to the *Invoice Plan* tab and click *⇒ Create Invoice Plan*. The
    wizard shows the applicable **Fee (%)**, the fee amount and the order
    total including the fee (**Amount + Fee**), previewing the same
    computation of the order.
-5. Enable **Add Fee** on the order to add the credit card fee to the
+7. Enable **Add Fee** on the order to add the credit card fee to the
    order total and to include it proportionally in each installment
    invoice. Leave it unchecked to track the fee without charging it.
-6. Confirm the wizard and invoice the installments from the invoice
+8. Confirm the wizard and invoice the installments from the invoice
    plan; each customer invoice will contain a *Credit Card Fee* line
    with its proportional share of the fee.
 

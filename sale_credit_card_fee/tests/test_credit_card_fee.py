@@ -8,6 +8,45 @@ _IMAGE = (
     "+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
 )
 
+# the fields the web client sends and gets back for the credit card fee
+# lines of a sale order and for the sale order itself
+FEE_LINE_SPEC = {
+    "id": {},
+    "amount": {},
+    "custom_amount": {},
+    "edited_amount": {},
+    "sum_fee": {},
+    "fee_amount": {},
+    "fee_percent": {},
+    "fee_range_id": {},
+    "payment_method_id": {},
+    "currency_id": {},
+}
+ORDER_SPEC = {
+    "credit_card_fee_line_ids": {"fields": FEE_LINE_SPEC},
+    "partner_id": {"fields": {"display_name": {}}},
+    "payment_method_ids": {"fields": {"id": {}}},
+    "order_line": {
+        "fields": {
+            "id": {},
+            "product_id": {"fields": {"display_name": {}}},
+            "product_uom_qty": {},
+            "price_unit": {},
+            "price_subtotal": {},
+        }
+    },
+    "invoice_plan_ids": {"fields": {"id": {}, "invoice_type": {}, "percent": {}}},
+    "amount_untaxed": {},
+    "amount_tax": {},
+    "amount_total": {},
+    "credit_card_fee_amount": {},
+    "credit_card_fee_percent": {},
+    "credit_card_amount_plus_fee": {},
+    "currency_id": {"fields": {"id": {}}},
+    "company_id": {"fields": {"id": {}}},
+    "payment_term_id": {"fields": {"id": {}}},
+}
+
 
 class TestCreditCardFee(AccountTestInvoicingCommon):
     chart_template = "generic_coa"
@@ -103,9 +142,13 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
         return method
 
     def _expected_amount(self, order, percent):
-        """Return the amount the fee lines add up to: order total plus fee."""
+        """Return the amount the fee lines add up to: the total of the order.
+
+        The fee is a part of that amount, so the order only receives the rest
+        of it, taxes included.
+        """
         base = order.amount_untaxed + order.amount_tax
-        return order.currency_id.round(base + base * percent / 100.0)
+        return order.currency_id.round(base / (1.0 - percent / 100.0))
 
     def _expected_fee(self, order, percent):
         """Return the fee charged on the default fee line amount."""
@@ -115,6 +158,19 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
     def _expected_line_fee(self, order, percent, amount):
         """Return the fee of ``percent`` charged on ``amount``."""
         return order.currency_id.round(amount * percent / 100.0)
+
+    def _assert_amounts_add_up_to_the_total(self, order):
+        """The amounts of the lines add up to the total of the order."""
+        self.assertAlmostEqual(
+            sum(order.credit_card_fee_line_ids.mapped("amount")),
+            order._credit_card_fee_default_amount(),
+            places=2,
+        )
+        self.assertAlmostEqual(
+            sum(order.credit_card_fee_line_ids.mapped("fee_amount")),
+            order.credit_card_fee_amount,
+            places=2,
+        )
 
     def test_payment_method_fee_ranges(self):
         self.assertTrue(self.payment_method.credit_card_admin)
@@ -144,10 +200,10 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
         order = self._create_sale_order()
         order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
         line = order.credit_card_fee_line_ids
-        base = order.amount_untaxed + order.amount_tax
-        self.assertEqual(line.amount, order.currency_id.round(base + base * 0.025))
         self.assertEqual(line.amount, self._expected_amount(order, 2.5))
         self.assertEqual(line.fee_amount, self._expected_fee(order, 2.5))
+        # The amount of the line is the total of the order, fee included.
+        self._assert_amounts_add_up_to_the_total(order)
 
     def test_fee_line_amount_is_editable(self):
         order = self._create_sale_order()
@@ -179,9 +235,8 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
         order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
         line = order.credit_card_fee_line_ids
         order.order_line.product_uom_qty = 2
-        base = order.amount_untaxed + order.amount_tax
-        self.assertEqual(line.amount, base + base * 0.025)
         self.assertEqual(line.amount, self._expected_amount(order, 2.5))
+        self._assert_amounts_add_up_to_the_total(order)
 
     def test_fee_line_custom_amount_is_kept(self):
         order = self._create_sale_order()
@@ -200,65 +255,64 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
         first, second = order.credit_card_fee_line_ids
         # The whole order is charged on the first fee line: the line added
         # after it starts with no amount at all.
-        amount = self._expected_amount(order, 2.5 + 1.5)
+        amount = self._expected_amount(order, 2.5)
         self.assertEqual(first.amount, amount)
         self.assertEqual(second.amount, 0.0)
         self.assertEqual(second.fee_amount, 0.0)
         self.assertAlmostEqual(
             order.credit_card_fee_amount, self._expected_line_fee(order, 2.5, amount)
         )
+        self._assert_amounts_add_up_to_the_total(order)
 
     def test_amount_edit_is_taken_from_the_other_lines(self):
         order = self._create_sale_order([self.payment_method, self.second_method])
         order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
-        amount = self._expected_amount(order, 2.5 + 1.5)
+        total = order._credit_card_fee_default_amount()
         first, second = order.credit_card_fee_line_ids
         second.amount = 20.0
         self.assertTrue(second.custom_amount)
         self.assertEqual(second.amount, 20.0)
-        self.assertEqual(first.amount, order.currency_id.round(amount - 20.0))
-        self.assertEqual(
-            sum(order.credit_card_fee_line_ids.mapped("amount")),
-            order.currency_id.round(amount),
-        )
-        self.assertEqual(
-            order.credit_card_fee_amount,
-            sum(order.credit_card_fee_line_ids.mapped("fee_amount")),
-        )
-        self.assertAlmostEqual(
-            order.amount_total, order.amount_untaxed + order.amount_tax + 2.79
-        )
+        # The other line takes exactly what the second one was given.
+        self.assertEqual(first.amount, order.currency_id.round(total - 20.0))
+        self.assertAlmostEqual(first.fee_amount, 2.45, places=2)
+        self.assertAlmostEqual(second.fee_amount, 0.30, places=2)
+        self._assert_amounts_add_up_to_the_total(order)
+
+    def test_amount_edit_of_an_amount_gives_it_back_to_the_other_lines(self):
+        order = self._create_sale_order([self.payment_method, self.second_method])
+        order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
+        total = order._credit_card_fee_default_amount()
+        first, second = order.credit_card_fee_line_ids
+        second.amount = 50.0
+        # Give the amount of the second line to the first one.
+        self.assertEqual(second.amount, 50.0)
+        self.assertEqual(first.amount, order.currency_id.round(total - 50.0))
+        self.assertEqual(second.amount, 50.0)
+        self._assert_amounts_add_up_to_the_total(order)
 
     def test_amount_edit_cannot_go_over_the_order_total(self):
         order = self._create_sale_order([self.payment_method, self.second_method])
         order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
-        amount = self._expected_amount(order, 2.5 + 1.5)
+        total = order._credit_card_fee_default_amount()
         first, second = order.credit_card_fee_line_ids
         second.amount = 1000.0
-        # The other lines do not hold that much: the amount is capped to the
-        # total of the order.
-        self.assertEqual(second.amount, amount)
+        # The other lines hold nothing: the amount is capped to the total.
+        self.assertEqual(second.amount, order.currency_id.round(total))
         self.assertEqual(first.amount, 0.0)
-        self.assertEqual(
-            sum(order.credit_card_fee_line_ids.mapped("amount")),
-            order.currency_id.round(amount),
-        )
+        self._assert_amounts_add_up_to_the_total(order)
 
     def test_amount_edit_of_the_line_holding_the_order_shares_it(self):
         order = self._create_sale_order([self.payment_method, self.second_method])
         order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
-        amount = self._expected_amount(order, 2.5 + 1.5)
+        total = order._credit_card_fee_default_amount()
         first, second = order.credit_card_fee_line_ids
         first.amount = 1000.0
+        self.assertEqual(first.amount, order.currency_id.round(total))
         first.amount = 50.0
-        # The line that still follows the order takes what the first one
-        # gives up, so the amounts keep adding up to the total.
+        # What the first line gives up is shared equally by the other ones.
         self.assertEqual(first.amount, 50.0)
-        self.assertEqual(second.amount, order.currency_id.round(amount - 50.0))
-        self.assertEqual(
-            sum(order.credit_card_fee_line_ids.mapped("amount")),
-            order.currency_id.round(amount),
-        )
+        self.assertEqual(second.amount, order.currency_id.round(total - 50.0))
+        self._assert_amounts_add_up_to_the_total(order)
 
     def test_amount_edit_is_spread_over_the_other_lines(self):
         third_method = self._create_admin_method("Cartao de Credito 3", "cartao_3", 2.0)
@@ -266,26 +320,24 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
             [self.payment_method, self.second_method, third_method]
         )
         order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
-        amount = self._expected_amount(order, 2.5 + 1.5 + 2.0)
+        total = order._credit_card_fee_default_amount()
         first, second, third = order.credit_card_fee_line_ids
-        second.amount = 20.0
-        self.assertEqual(first.amount, order.currency_id.round(amount - 20.0))
-        self.assertEqual(third.amount, 0.0)
-        third.amount = 60.0
-        # The amounts the user chose are kept and what is left of the total
-        # goes to the line that still follows the order.
-        self.assertEqual(second.amount, 20.0)
-        self.assertEqual(third.amount, 60.0)
-        self.assertEqual(first.amount, order.currency_id.round(amount - 80.0))
-        self.assertEqual(
-            sum(order.credit_card_fee_line_ids.mapped("amount")),
-            order.currency_id.round(amount),
-        )
+        first.amount = 50.0
+        # What the first line gives up is shared equally by the other two.
+        share = order.currency_id.round((total - 50.0) / 2)
+        self.assertEqual(second.amount, share)
+        self.assertEqual(third.amount, order.currency_id.round(total - 50.0 - share))
+        # And what a line is given is shared equally by the other two.
+        second.amount = 60.0
+        given = 60.0 - share
+        self.assertAlmostEqual(third.amount, total - 50.0 - share - given / 2, places=2)
+        self.assertEqual(first.amount, order.currency_id.round(50.0 - given / 2))
+        self._assert_amounts_add_up_to_the_total(order)
 
     def test_amount_edit_restores_the_total_of_the_order(self):
         order = self._create_sale_order([self.payment_method, self.second_method])
         order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
-        amount = self._expected_amount(order, 2.5 + 1.5)
+        total = order._credit_card_fee_default_amount()
         first, second = order.credit_card_fee_line_ids
         # An order left with amounts that do not add up to the total of the
         # order, as the previous versions did, is settled on the next edit.
@@ -295,11 +347,8 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
         self.assertEqual(sum(order.credit_card_fee_line_ids.mapped("amount")), 20.0)
         second.amount = 30.0
         self.assertEqual(second.amount, 30.0)
-        self.assertEqual(first.amount, order.currency_id.round(amount - 30.0))
-        self.assertEqual(
-            sum(order.credit_card_fee_line_ids.mapped("amount")),
-            order.currency_id.round(amount),
-        )
+        self.assertEqual(first.amount, order.currency_id.round(total - 30.0))
+        self._assert_amounts_add_up_to_the_total(order)
 
     def test_edited_amount_is_kept_when_the_order_changes(self):
         order = self._create_sale_order([self.payment_method, self.second_method])
@@ -310,11 +359,11 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
         # The line that still follows the order takes what is left of the
         # new total, which is twice as big.
         self.assertEqual(second.amount, 20.0)
-        self.assertEqual(first.amount, self._expected_amount(order, 4.0) - 20.0)
         self.assertEqual(
-            sum(order.credit_card_fee_line_ids.mapped("amount")),
-            self._expected_amount(order, 4.0),
+            first.amount,
+            order.currency_id.round(order._credit_card_fee_default_amount() - 20.0),
         )
+        self._assert_amounts_add_up_to_the_total(order)
 
     def test_added_fee_line_amount_is_zero(self):
         order = self._create_sale_order()
@@ -325,20 +374,50 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
         new_line = order.credit_card_fee_line_ids - first
         self.assertEqual(new_line.payment_method_id, self.second_method)
         self.assertEqual(new_line.amount, 0.0)
-        self.assertEqual(first.amount, self._expected_amount(order, 4.0))
+        self.assertEqual(first.amount, self._expected_amount(order, 2.5))
+        self._assert_amounts_add_up_to_the_total(order)
 
     def _edit_fee_amount(self, order, index, amount):
         """Edit the amount of a fee line the way the form does it.
 
         The web client asks the fee line for its own onchange first, which
-        flags the amount as chosen by the user, and then the order for the
-        checks of the whole listing.
+        flags the amount as chosen by the user and marks the line as edited,
+        then the order for the checks of the whole listing, and finally saves
+        the order with the values it got back.
         """
-        line = order.credit_card_fee_line_ids[index]
-        line.custom_amount = True
-        with Form(order) as order_form:
-            with order_form.credit_card_fee_line_ids.edit(index) as line_form:
-                line_form.amount = amount
+        lines = order.credit_card_fee_line_ids
+        line = lines[index]
+        pending = {
+            fee_line.id: {
+                "amount": fee_line.amount,
+                "custom_amount": fee_line.custom_amount,
+                "edited_amount": fee_line.edited_amount,
+            }
+            for fee_line in lines
+        }
+        pending[line.id]["amount"] = amount
+        values = (
+            line.onchange(dict(pending[line.id]), ["amount"], FEE_LINE_SPEC).get(
+                "value"
+            )
+            or {}
+        )
+        pending[line.id].update(values)
+        commands = [[1, line_id, dict(vals)] for line_id, vals in pending.items()]
+        result = order.onchange(
+            {"credit_card_fee_line_ids": commands},
+            ["credit_card_fee_line_ids"],
+            ORDER_SPEC,
+        )
+        for command in result.get("value", {}).get("credit_card_fee_line_ids") or []:
+            pending[command[1]].update(command[2] or {})
+        order.write(
+            {
+                "credit_card_fee_line_ids": [
+                    [1, line_id, dict(vals)] for line_id, vals in pending.items()
+                ]
+            }
+        )
 
     def test_onchange_amount_flags_the_line_as_edited(self):
         order = self._create_sale_order()
@@ -350,38 +429,33 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
     def test_onchange_amount_is_shared_with_the_other_lines(self):
         order = self._create_sale_order([self.payment_method, self.second_method])
         order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
-        amount = self._expected_amount(order, 2.5 + 1.5)
+        total = order._credit_card_fee_default_amount()
         first, second = order.credit_card_fee_line_ids
         self._edit_fee_amount(order, 1, 20.0)
         # The onchange shares the amount before the order is saved.
         self.assertEqual(second.amount, 20.0)
-        self.assertEqual(first.amount, order.currency_id.round(amount - 20.0))
-        self.assertEqual(
-            sum(order.credit_card_fee_line_ids.mapped("amount")),
-            order.currency_id.round(amount),
-        )
+        self.assertEqual(first.amount, order.currency_id.round(total - 20.0))
+        self._assert_amounts_add_up_to_the_total(order)
 
     def test_onchange_amount_cannot_go_over_the_order_total(self):
         order = self._create_sale_order([self.payment_method, self.second_method])
         order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
-        amount = self._expected_amount(order, 2.5 + 1.5)
+        total = order._credit_card_fee_default_amount()
         first, second = order.credit_card_fee_line_ids
         self._edit_fee_amount(order, 1, 1000.0)
-        self.assertEqual(second.amount, amount)
+        self.assertEqual(second.amount, order.currency_id.round(total))
         self.assertEqual(first.amount, 0.0)
-        self.assertEqual(
-            sum(order.credit_card_fee_line_ids.mapped("amount")),
-            order.currency_id.round(amount),
-        )
+        self._assert_amounts_add_up_to_the_total(order)
 
     def test_onchange_amount_of_the_line_holding_the_order_shares_it(self):
         order = self._create_sale_order([self.payment_method, self.second_method])
         order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
-        amount = self._expected_amount(order, 2.5 + 1.5)
+        total = order._credit_card_fee_default_amount()
         first, second = order.credit_card_fee_line_ids
         self._edit_fee_amount(order, 0, 50.0)
         self.assertEqual(first.amount, 50.0)
-        self.assertEqual(second.amount, order.currency_id.round(amount - 50.0))
+        self.assertEqual(second.amount, order.currency_id.round(total - 50.0))
+        self._assert_amounts_add_up_to_the_total(order)
 
     def test_onchange_keeps_the_other_amounts_following_the_order(self):
         order = self._create_sale_order([self.payment_method, self.second_method])
@@ -393,23 +467,39 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
         self.assertFalse(first.custom_amount)
         order.order_line.product_uom_qty = 2
         self.assertEqual(second.amount, 20.0)
-        self.assertEqual(first.amount, self._expected_amount(order, 4.0) - 20.0)
+        self.assertEqual(
+            first.amount,
+            order.currency_id.round(order._credit_card_fee_default_amount() - 20.0),
+        )
+        self._assert_amounts_add_up_to_the_total(order)
 
-    def test_onchange_amount_cannot_go_over_the_other_amounts(self):
+    def test_onchange_amount_is_shared_with_every_other_line(self):
+        third_method = self._create_admin_method("Cartao de Credito 3", "cartao_3", 2.0)
+        order = self._create_sale_order(
+            [self.payment_method, self.second_method, third_method]
+        )
+        order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
+        total = order._credit_card_fee_default_amount()
+        first, second, third = order.credit_card_fee_line_ids
+        self._edit_fee_amount(order, 0, 50.0)
+        # What the first line gives up is shared equally by the other two.
+        share = order.currency_id.round((total - 50.0) / 2)
+        self.assertEqual(second.amount, share)
+        self.assertEqual(third.amount, order.currency_id.round(total - 50.0 - share))
+        self._assert_amounts_add_up_to_the_total(order)
+
+    def test_onchange_amount_keeps_the_amount_the_user_edited(self):
         order = self._create_sale_order([self.payment_method, self.second_method])
         order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
-        amount = self._expected_amount(order, 2.5 + 1.5)
+        total = order._credit_card_fee_default_amount()
         first, second = order.credit_card_fee_line_ids
-        self._edit_fee_amount(order, 1, 20.0)
-        self._edit_fee_amount(order, 0, 1000.0)
-        # What the amount chosen by the user holds is not taken from it: the
-        # amount that does not fit is the one of the line edited last.
-        self.assertEqual(second.amount, 20.0)
-        self.assertEqual(first.amount, order.currency_id.round(amount - 20.0))
-        self.assertEqual(
-            sum(order.credit_card_fee_line_ids.mapped("amount")),
-            order.currency_id.round(amount),
-        )
+        self._edit_fee_amount(order, 1, 50.0)
+        self._edit_fee_amount(order, 0, 70.0)
+        # The amount just edited is kept as it was typed, whatever the other
+        # line holds, and the difference is shared by the other lines.
+        self.assertEqual(first.amount, 70.0)
+        self.assertEqual(second.amount, order.currency_id.round(total - 70.0))
+        self._assert_amounts_add_up_to_the_total(order)
 
     def test_fee_percent_is_comma_separated(self):
         order = self._create_sale_order([self.payment_method, self.second_method])
@@ -437,11 +527,12 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
         order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
         self.assertEqual(order.credit_card_fee_percent_sum, 2.5 + 1.5)
         # The whole amount of the order is charged on the first fee line.
-        amount = self._expected_amount(order, 2.5 + 1.5)
+        amount = self._expected_amount(order, 2.5)
         self.assertAlmostEqual(
             order.credit_card_fee_amount,
             self._expected_line_fee(order, 2.5, amount),
         )
+        self._assert_amounts_add_up_to_the_total(order)
 
     def test_no_fee_without_admin(self):
         order = Form(self.env["sale.order"])
@@ -565,7 +656,7 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
         total_before = order.amount_total
         wizard = self._create_wizard(order)
         self.assertEqual(wizard.credit_card_fee_percent, 2.5 + 1.5)
-        amount = self._expected_amount(order, 2.5 + 1.5)
+        amount = self._expected_amount(order, 2.5)
         self.assertAlmostEqual(
             wizard.credit_card_fee_amount,
             self._expected_line_fee(order, 2.5, amount),
