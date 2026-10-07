@@ -24,7 +24,9 @@ To use this module, you need to:
    going below zero, so the **Amount** of the rows never adds up to more
    than the total of the order. An amount bigger than that total is
    refused. Setting the **Amount** of a row to zero gives the whole total
-   back to the other row when there is only one left.
+   back to the other row when there is only one left. The row being edited
+   is the one holding an amount that is no longer the saved one, so the
+   listing is settled even when the row is edited by another client.
 5. A row whose **Amount** was edited stops following the order total and
    the credit card fees: when the order changes, the rows that were not
    edited share the new total.

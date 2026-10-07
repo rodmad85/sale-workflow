@@ -63,10 +63,18 @@ class SaleOrder(models.Model):
 
         The amount the user just edited is kept and the other lines share
         what is left of the total of the order between them, equally, without
-        waiting for the order to be saved.
+        waiting for the order to be saved. The marker of the line being edited
+        tells it from the ones already edited; when it does not reach the
+        checks, the amounts that changed since they were saved do.
         """
         lines = self.credit_card_fee_line_ids
-        lines._check_amounts(edited=lines.filtered("edited_amount"))
+        edited = lines.filtered("edited_amount")
+        if not edited:
+            edited = lines._amounts_changed(lines._stored_amounts())
+        lines._check_amounts(edited=edited)
+        # Only the next edit counts: the amounts the client gets back carry no
+        # marker, so editing another line does not bring this one back.
+        lines.write({"edited_amount": False})
 
     def _sync_credit_card_fee_lines(self):
         """Keep one fee line per selected card administrator payment method."""
@@ -94,14 +102,21 @@ class SaleOrder(models.Model):
 
     def write(self, vals):
         if "credit_card_fee_line_ids" in vals:
-            # The amounts that come with the fee lines are the ones the
-            # checks of the module produced, either by the onchange of the
-            # form or by the checks themselves: write them as they are, the
-            # lines edited by the user being the ones flagged as custom.
+            lines = self.credit_card_fee_line_ids
+            # What the client sends for the lines is known before they are
+            # written, as the stored amounts are what they are compared with.
+            stored = lines._stored_amounts()
+            # The amounts that come with the fee lines are the ones the checks
+            # of the module produced, either by the onchange of the form or by
+            # the checks themselves: write them as they are, the lines edited
+            # by the user being the ones whose amount changed.
             orders = self.with_context(credit_card_fee_sync_amount=True)
             res = super(SaleOrder, orders).write(vals)
             lines = self.credit_card_fee_line_ids
-            lines._check_amounts(edited=lines.filtered("edited_amount") or None)
+            edited = lines.filtered("edited_amount")
+            if not edited:
+                edited = lines._amounts_changed(stored)
+            lines._check_amounts(edited=edited or None)
             lines.write({"edited_amount": False})
             return res
         res = super().write(vals)

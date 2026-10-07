@@ -445,6 +445,25 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
             }
         )
 
+    def _onchange_fee_amounts(self, order, amounts):
+        """Return the amounts the listing holds after the given ones are set.
+
+        Only the amounts are sent, the way a client that does not know the
+        technical fields of the listing does.
+        """
+        lines = order.credit_card_fee_line_ids
+        pending = {
+            line.id: {"amount": amounts.get(line, line.amount)} for line in lines
+        }
+        result = order.onchange(
+            {"credit_card_fee_line_ids": [[1, k, v] for k, v in pending.items()]},
+            ["credit_card_fee_line_ids"],
+            ORDER_SPEC,
+        )
+        for command in result.get("value", {}).get("credit_card_fee_line_ids") or []:
+            pending.setdefault(command[1], {}).update(command[2] or {})
+        return {line.id: pending[line.id]["amount"] for line in lines}
+
     def test_onchange_amount_flags_the_line_as_edited(self):
         order = self._create_sale_order()
         order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
@@ -530,6 +549,51 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
             order.currency_id.round(order._credit_card_fee_default_amount() - 20.0),
         )
         self._assert_amounts_add_up_to_the_total(order)
+
+    def test_onchange_amount_without_the_technical_fields(self):
+        """The listing settles the amounts even without the technical fields.
+
+        A client that only knows the amount column of the listing, an older
+        view or a script, sends the amounts alone: the lines whose amount
+        changed since it was saved are the ones the user edited anyway.
+        """
+        order = self._create_sale_order([self.payment_method, self.second_method])
+        order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
+        total = order._credit_card_fee_default_amount()
+        first, second = order.credit_card_fee_line_ids
+        values = self._onchange_fee_amounts(order, {second: 50.0})
+        self.assertEqual(values[second.id], 50.0)
+        self.assertEqual(values[first.id], order.currency_id.round(total - 50.0))
+
+    def test_write_amounts_without_the_technical_fields(self):
+        """Saving the amounts alone settles them as well."""
+        order = self._create_sale_order([self.payment_method, self.second_method])
+        order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
+        total = order._credit_card_fee_default_amount()
+        first, second = order.credit_card_fee_line_ids
+        order.write(
+            {
+                "credit_card_fee_line_ids": [
+                    [1, first.id, {"amount": first.amount}],
+                    [1, second.id, {"amount": 50.0}],
+                ]
+            }
+        )
+        self.assertEqual(second.amount, 50.0)
+        self.assertEqual(first.amount, order.currency_id.round(total - 50.0))
+        self._assert_amounts_add_up_to_the_total(order)
+
+    def test_amounts_add_up_to_the_total_when_every_line_is_edited(self):
+        """Amounts of every line that do not add up share the difference."""
+        order = self._create_sale_order([self.payment_method, self.second_method])
+        order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
+        total = order._credit_card_fee_default_amount()
+        first, second = order.credit_card_fee_line_ids
+        values = self._onchange_fee_amounts(order, {first: 50.0, second: 20.0})
+        self.assertAlmostEqual(sum(values.values()), total, places=2)
+        self.assertEqual(
+            values[second.id], order.currency_id.round(total - values[first.id])
+        )
 
     def test_onchange_amount_is_shared_with_every_other_line(self):
         third_method = self._create_admin_method("Cartao de Credito 3", "cartao_3", 2.0)

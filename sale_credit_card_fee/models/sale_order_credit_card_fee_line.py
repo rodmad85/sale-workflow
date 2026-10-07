@@ -78,6 +78,39 @@ class SaleOrderCreditCardFeeLine(models.Model):
         )
 
     @api.model
+    def _stored_amounts(self, lines=None):
+        """Return the stored amount of each of the given fee lines.
+
+        The stored values are the ones of the database, so they are read on
+        the record behind the one being checked, which is the record itself
+        when it is not a copy made by an onchange.
+        """
+        lines = lines or self
+        return {
+            line.id: line.amount
+            for order in lines.sale_order_id._origin
+            for line in order.credit_card_fee_line_ids
+        }
+
+    @api.model
+    def _amounts_changed(self, stored, lines=None):
+        """Return the fee lines whose amount is no longer the stored one.
+
+        The web client only sends back to the server the fields of the listing
+        of the fee lines, so the marker of the line the user is editing does
+        not always reach the checks. Comparing the amounts that come with the
+        listing with the stored ones tells which lines the user changed, which
+        is all the checks need to take the difference from the other lines.
+
+        The listing of an onchange holds copies of the lines of the database,
+        so they are looked up by the id of the record behind them.
+        """
+        lines = lines or self
+        return lines.filtered(
+            lambda line, stored=stored: stored.get(line._origin.id, 0.0) != line.amount
+        )
+
+    @api.model
     def _share_amount(self, lines, amount):
         """Return the amounts of ``lines`` holding ``amount`` together.
 
@@ -148,6 +181,9 @@ class SaleOrderCreditCardFeeLine(models.Model):
         - when the user edits an amount, the other lines share what is left
           of that total equally, so the amounts can never add up to more than
           it;
+        - when every line was edited and there is more than one of them, they
+          share what is left of the total between them, so the amounts always
+          add up to it;
         - when the order changes, the lines whose amount was edited keep it
           and what is left of the total goes to the first line that still
           follows the order, the other ones being left with no amount.
@@ -161,9 +197,19 @@ class SaleOrderCreditCardFeeLine(models.Model):
                 # The user chose amounts: the other lines share what is left
                 # of the total of the order between them, equally.
                 others = lines - edited
-                values = self._share_amount(
-                    others, total - sum(edited.mapped("amount"))
-                )
+                if not others and len(lines) > 1:
+                    # Every line was edited: there is no other line to take
+                    # the difference from, so they share it between them and
+                    # the amounts add up to the total of the order again. An
+                    # order with a single fee line keeps the amount the user
+                    # chose, so that the fee can be charged on less than the
+                    # whole order.
+                    others = lines
+                    values = self._share_amount(lines, total)
+                else:
+                    values = self._share_amount(
+                        others, total - sum(edited.mapped("amount"))
+                    )
                 self._write_amount(list(zip(others, values, strict=False)))
             else:
                 # Nothing was just edited: the amounts chosen by the user are

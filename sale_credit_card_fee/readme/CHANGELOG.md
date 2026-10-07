@@ -13,7 +13,9 @@ All notable changes to this module will be documented in this file.
   add up to more than the total of the order.
 - Check the amounts of the fee lines while the order is being edited: the
   listing is corrected as soon as an amount changes, without waiting for
-  the order to be saved.
+  the order to be saved. The line being edited is found by the marker of the
+  listing or, when it does not reach the server, by the amounts that changed
+  since they were saved, so the other lines always share the difference.
 - Keep the technical fields of those checks in the listing of the fee lines,
   hidden, so that the web client sends them back to the server with the
   amounts and the order is settled even if a listing is edited by another
