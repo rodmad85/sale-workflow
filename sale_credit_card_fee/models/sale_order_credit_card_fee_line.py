@@ -42,12 +42,12 @@ class SaleOrderCreditCardFeeLine(models.Model):
     amount = fields.Monetary(
         currency_field="currency_id",
         help="Amount the fee of this payment method is charged on. The fee "
-        "is a part of that amount, so the amounts of the lines of an order "
-        "add up to the total of the order, taxes and credit card fees "
-        "included. The whole of that amount is charged on the first line by "
-        "default and a line added to an order that already has one starts "
-        "with no amount at all. Editing it gives that amount to the line, "
-        "which is then taken from the lines that still follow the order.",
+        "is charged on top of that amount, so the amounts of the lines of an "
+        "order add up to the total of the order, taxes included. The whole of "
+        "that amount is charged on the first line by default and a line added "
+        "to an order that already has one starts with no amount at all. "
+        "Editing it gives that amount to the line, which is then taken from "
+        "the lines that still follow the order.",
     )
     custom_amount = fields.Boolean(
         default=False,
@@ -76,18 +76,6 @@ class SaleOrderCreditCardFeeLine(models.Model):
         return ", ".join(
             f"{percent:.2f}".rstrip("0").rstrip(".") for percent in percents if percent
         )
-
-    @api.model
-    def _amount_of_net(self, net, percent):
-        """Return the amount leaving ``net`` of the order with that fee.
-
-        The customer pays that amount with its card and the fee is a part of
-        it, so the order only receives the rest.
-        """
-        ratio = 1.0 - (percent or 0.0) / 100.0
-        if ratio <= 0.0:
-            return net
-        return net / ratio
 
     @api.model
     def _share_amount(self, lines, amount):
@@ -131,8 +119,8 @@ class SaleOrderCreditCardFeeLine(models.Model):
         """Return the amount the given lines can hold of the order.
 
         The amounts of the lines of an order add up to the total of the order,
-        taxes and credit card fees included, and the other lines can give up
-        everything they hold, so a line can never hold more than that total.
+        taxes included, and the other lines can give up everything they hold,
+        so a line can never hold more than that total.
         """
         total = lines[:1].sale_order_id._credit_card_fee_default_amount()
         return max(min(amount, total / max(len(lines), 1)), 0.0)
@@ -154,7 +142,8 @@ class SaleOrderCreditCardFeeLine(models.Model):
         """Keep the amounts of the lines adding up to the total of the order.
 
         The amounts of the fee lines of an order add up to the total of the
-        order, taxes and credit card fees included:
+        order, taxes included, the fee of each card being charged on top of
+        the amount charged on it:
 
         - when the user edits an amount, the other lines share what is left
           of that total equally, so the amounts can never add up to more than

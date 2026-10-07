@@ -38,7 +38,8 @@ class SaleCreateInvoicePlan(models.TransientModel):
 
         The preview applies the same computation as the sale order fee lines:
         the order, taxes included, is charged on the first fee line, the ones
-        after it starting with no amount at all.
+        after it starting with no amount at all, and the fee of that line is
+        charged on top of it.
         """
         for rec in self:
             sale = rec.sale_id
@@ -59,10 +60,11 @@ class SaleCreateInvoicePlan(models.TransientModel):
                 if fee:
                     percents.append(fee.fee_percent or 0.0)
             rec.credit_card_fee_percent = sum(percents)
+            # The preview follows the default distribution of the fee lines:
+            # the order, taxes included, is charged on the first one, so only
+            # its fee is charged.
             base = sale._credit_card_fee_base()
-            fee_lines = self.env["sale.order.credit.card.fee.line"]
-            amount = fee_lines._amount_of_net(base, percents[:1] and percents[0] or 0.0)
             rec.credit_card_fee_amount = sum(
-                amount * percent / 100.0 for percent in percents[:1]
+                base * percent / 100.0 for percent in percents[:1]
             )
             rec.amount_plus_fee = base + rec.credit_card_fee_amount

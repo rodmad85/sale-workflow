@@ -48,18 +48,9 @@ class SaleOrder(models.Model):
     @api.onchange("payment_method_ids")
     def _onchange_payment_method_ids(self):
         card_admins = self.payment_method_ids.filtered("credit_card_admin")
-        lines = self.env["sale.order.credit.card.fee.line"]
-        percent = next(
-            (
-                line.fee_percent
-                for line in self.credit_card_fee_line_ids
-                if line.payment_method_id in card_admins
-            ),
-            0.0,
-        )
-        # The whole order is charged on the first fee line: the lines added
-        # after it start with no amount at all.
-        amount = lines._amount_of_net(self._credit_card_fee_base(), percent)
+        # The whole order, taxes included, is charged on the first fee line:
+        # the lines added after it start with no amount at all.
+        amount = self._credit_card_fee_base()
         commands = [(5, 0, 0)]
         amounts = [amount] + [0.0] * (len(card_admins) - 1)
         for method, value in zip(card_admins, amounts, strict=False):
@@ -131,15 +122,13 @@ class SaleOrder(models.Model):
     def _credit_card_fee_default_amount(self):
         """Return the amount the fee lines of the order add up to by default.
 
-        The fee lines add up to the total of the order, taxes and credit card
-        fees included, which is what they leave of the order once their own
-        fee is taken. By default the whole of that amount is charged on the
-        first fee line, the other ones having no amount at all.
+        The fee lines add up to the total of the order, taxes included, and the
+        fee of each card is charged on top of the amount charged on it. By
+        default the whole of that total is charged on the first fee line, the
+        other ones having no amount at all.
         """
         self.ensure_one()
-        lines = self.env["sale.order.credit.card.fee.line"]
-        percent = self.credit_card_fee_line_ids[:1].fee_percent
-        return lines._amount_of_net(self._credit_card_fee_base(), percent)
+        return self._credit_card_fee_base()
 
     @api.depends(
         "credit_card_fee_line_ids",

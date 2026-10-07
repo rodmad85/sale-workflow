@@ -9,10 +9,10 @@ To use this module, you need to:
    with the payment method name and the fields **Add Fee**,
    **Credit Card Fee Range**, **Fee (%)**, **Amount** and
    **Fee Amount**.
-3. The **Amount** of a row is the part of the order paid with that card:
-   its fee is a part of that amount, so the **Amount** of the rows adds up
-   to the total of the order, taxes and credit card fees included. The
-   whole of it is charged on the first row, and a row added to an order
+3. The **Amount** of a row is the part of the order paid with that card.
+   The **Amount** of the rows adds up to the total of the order, taxes
+   included, and the fee of each card is charged on top of it. The whole
+   of that total is charged on the first row, and a row added to an order
    that already has one starts with the **Amount** set to zero.
    **Fee Amount** is the fee of that row: its **Fee (%)** applied on its
    **Amount**.
