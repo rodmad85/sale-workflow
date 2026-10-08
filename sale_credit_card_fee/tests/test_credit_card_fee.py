@@ -1,6 +1,7 @@
 from lxml import etree
 
 from odoo.tests import Form
+from odoo.tests.common import new_test_user
 
 from odoo.addons.account.tests.common import AccountTestInvoicingCommon
 from odoo.addons.sale.models.sale_order import SaleOrder
@@ -919,3 +920,127 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
         self.assertFalse(
             move.invoice_line_ids.filtered(lambda line: line.product_id == product)
         )
+
+    def test_account_move_shows_the_fee_lines_of_the_order(self):
+        """The invoice form lists the credit card fees of its sale order."""
+        order = self._create_sale_order([self.payment_method, self.second_method])
+        order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
+        self._confirm_sale_order(order)
+        move = order._create_invoices()
+        self.assertEqual(move.credit_card_fee_line_ids, order.credit_card_fee_line_ids)
+        self.assertEqual(
+            move.credit_card_fee_line_ids.payment_method_id,
+            self.payment_method + self.second_method,
+        )
+
+    def test_account_move_without_card_admin_shows_no_fee_line(self):
+        order_form = Form(self.env["sale.order"])
+        order_form.partner_id = self.partner
+        with order_form.order_line.new() as line:
+            line.product_id = self.product
+            line.product_uom_qty = 1
+        order = order_form.save()
+        order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
+        self._confirm_sale_order(order)
+        move = order._create_invoices()
+        self.assertFalse(move.credit_card_fee_line_ids)
+
+    def test_account_move_shows_the_fee_lines_of_every_order(self):
+        """An invoice of several orders shows the fee lines of all of them."""
+        first = self._create_sale_order([self.payment_method])
+        second = self._create_sale_order([self.second_method])
+        for order in (first, second):
+            order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
+            self._confirm_sale_order(order)
+        move = (first + second)._create_invoices()
+        # both orders are invoiced in the same invoice, as they share the
+        # partner the invoices are grouped by
+        self.assertEqual(len(move), 1)
+        self.assertEqual(
+            move.credit_card_fee_line_ids,
+            first.credit_card_fee_line_ids + second.credit_card_fee_line_ids,
+        )
+        # and the invoice holds the fee of both of them
+        product = self.env.ref("sale_credit_card_fee.product_credit_card_fee")
+        fee_lines = move.invoice_line_ids.filtered(
+            lambda line: line.product_id == product
+        )
+        self.assertEqual(len(fee_lines), 2)
+        self.assertAlmostEqual(
+            sum(fee_lines.mapped("price_unit")),
+            first.credit_card_fee_amount + second.credit_card_fee_amount,
+        )
+        self.assertAlmostEqual(
+            move.credit_card_fee_amount,
+            first.credit_card_fee_amount + second.credit_card_fee_amount,
+        )
+        self.assertAlmostEqual(
+            move.credit_card_amount_plus_fee,
+            first.credit_card_amount_plus_fee + second.credit_card_amount_plus_fee,
+        )
+
+    def test_account_move_form_lists_the_fee_lines(self):
+        """The fee lines of the order are a listing in the invoice form."""
+        view = self.env["account.move"].get_view(
+            view_id=self.env.ref(
+                "sale_credit_card_fee.view_move_form_inherit_card_fee"
+            ).id
+        )
+        listing = etree.fromstring(view["arch"]).xpath(
+            "//field[@name='credit_card_fee_line_ids']//list//field"
+        )
+        self.assertEqual(
+            {node.get("name") for node in listing},
+            {
+                "payment_method_id",
+                "sum_fee",
+                "fee_range_id",
+                "fee_percent",
+                "amount",
+                "fee_amount",
+            },
+        )
+
+    def test_invoice_form_read_by_an_accounting_user(self):
+        """The invoice form shows the fee lines to the invoicing users."""
+        accountant = new_test_user(
+            self.env,
+            login="credit_card_fee_accountant",
+            groups="base.group_user,account.group_account_invoice",
+        )
+        order = self._create_sale_order()
+        order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
+        self._confirm_sale_order(order)
+        move = order._create_invoices().with_user(accountant)
+        fee_lines = move.credit_card_fee_line_ids
+        self.assertEqual(fee_lines, order.credit_card_fee_line_ids)
+        # the rows and the cards they belong to are read by the accountant
+        self.assertEqual(
+            fee_lines.mapped("payment_method_id.name"), self.payment_method.name
+        )
+        self.assertAlmostEqual(
+            fee_lines.fee_amount, order.credit_card_fee_amount, places=2
+        )
+        self.assertAlmostEqual(
+            move.credit_card_fee_amount, order.credit_card_fee_amount
+        )
+
+    def test_accounting_groups_can_read_the_credit_card_fees(self):
+        """The fees of the invoice form are read-only for the accounting."""
+        groups = self.env.ref("account.group_account_invoice") + self.env.ref(
+            "account.group_account_readonly"
+        )
+        for model in ("sale.order.credit.card.fee.line", "credit.card.fee.range"):
+            accesses = self.env["ir.model.access"].search(
+                [("model_id.model", "=", model), ("group_id", "in", groups.ids)]
+            )
+            self.assertEqual(len(accesses), len(groups), model)
+            self.assertTrue(all(access.perm_read for access in accesses), model)
+            self.assertFalse(
+                any(
+                    access.perm_write or access.perm_create or access.perm_unlink
+                    for access in accesses
+                ),
+                model,
+            )
+

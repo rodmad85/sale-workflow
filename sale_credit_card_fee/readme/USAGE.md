@@ -44,3 +44,12 @@ To use this module, you need to:
 In the totals of the sale order, **Fee (%)** lists the fee of each
 credit card of the order separated by commas (e.g. *2.5, 3.5*), while
 **Fee Amount** is the sum of the **Fee Amount** of its rows.
+
+The customer invoice shows the same information. Its **Credit Card Fees**
+tab lists the rows of the sale orders it comes from, with the payment method,
+the fee range, the **Fee (%)**, the **Amount** the fee is charged on and the
+**Fee Amount**; the tab only shows when there is a card administrator
+involved. The rows are read-only there: the fee is set on the sale order.
+The totals of the invoice show the **Fee (%)**, the **Fee Amount** and the
+**Amount + Fee** of those orders, and the payment methods of the invoice are
+shown in the header, next to the due date.

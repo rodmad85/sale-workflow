@@ -1,5 +1,9 @@
 "id","name","model_id:id","group_id:id","perm_read","perm_write","perm_create","perm_unlink"
 "credit_card_fee_range_user","credit.card.fee.range user","model_credit_card_fee_range","sales_team.group_sale_salesman",1,1,1,1
 "access_credit_card_fee_range_manager","credit.card.fee.range manager","model_credit_card_fee_range","sales_team.group_sale_manager",1,1,1,1
+"credit_card_fee_range_invoice","credit.card.fee.range invoice","model_credit_card_fee_range","account.group_account_invoice",1,0,0,0
+"credit_card_fee_range_readonly","credit.card.fee.range readonly","model_credit_card_fee_range","account.group_account_readonly",1,0,0,0
 "sale_order_credit_card_fee_line_user","sale.order.credit.card.fee.line user","model_sale_order_credit_card_fee_line","sales_team.group_sale_salesman",1,1,1,1
 "access_sale_order_credit_card_fee_line_manager","sale.order.credit.card.fee.line manager","model_sale_order_credit_card_fee_line","sales_team.group_sale_manager",1,1,1,1
+"sale_order_credit_card_fee_line_invoice","sale.order.credit.card.fee.line invoice","model_sale_order_credit_card_fee_line","account.group_account_invoice",1,0,0,0
+"sale_order_credit_card_fee_line_readonly","sale.order.credit.card.fee.line readonly","model_sale_order_credit_card_fee_line","account.group_account_readonly",1,0,0,0

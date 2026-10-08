@@ -1,5 +1,20 @@
 All notable changes to this module will be documented in this file.
 
+## 18.0.4.1.0 (2026-10-08)
+
+- Show the credit card fees of the sale order in the customer invoice
+  form: a **Credit Card Fees** tab lists the fee of every card
+  administrator of the orders the invoice comes from, with the amount
+  it is charged on and the fee itself, and an invoice of several orders
+  shows the fee of all of them.
+- Let the invoicing and accounting users read the credit card fees of
+  the invoice form.
+- Invoice the credit card fee of every order an invoice groups, instead
+  of the fee of the first one only.
+- Show the payment methods of the invoice in the header, next to the
+  due date, as *sale_payment_method* does, instead of after the payment
+  terms.
+
 ## 18.0.4.0.1 (2026-10-07)
 
 - Share the amount of the order between its credit card fee lines: the

@@ -207,23 +207,28 @@ class SaleOrder(models.Model):
                     lambda line, order=order: line.order_id == order
                 ):
                     continue
-                if move.invoice_line_ids.filtered(
-                    lambda line: line.product_id == product
-                ):
-                    continue
                 lines = []
                 for fee_line in fee_lines:
+                    name = self.env._("Credit Card Fee (%s%%) - %s") % (
+                        fee_line.fee_percent,
+                        fee_line.payment_method_id.name,
+                    )
+                    if move.invoice_line_ids.filtered(
+                        lambda line, name=name: (
+                            line.product_id == product and line.name == name
+                        )
+                    ):
+                        # The fee of this card is already on the invoice: an
+                        # invoice grouping several orders holds the fee of
+                        # every one of them.
+                        continue
                     lines.append(
                         (
                             0,
                             0,
                             {
                                 "product_id": product.id,
-                                "name": self.env._("Credit Card Fee (%s%%) - %s")
-                                % (
-                                    fee_line.fee_percent,
-                                    fee_line.payment_method_id.name,
-                                ),
+                                "name": name,
                                 "quantity": 1,
                                 "price_unit": fee_amount
                                 * fee_line.fee_amount
@@ -232,5 +237,6 @@ class SaleOrder(models.Model):
                             },
                         )
                     )
-                move.write({"invoice_line_ids": lines})
+                if lines:
+                    move.write({"invoice_line_ids": lines})
         return moves

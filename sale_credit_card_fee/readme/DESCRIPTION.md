@@ -13,4 +13,7 @@ It allows you to:
 - Optionally sum the credit card fee to the sale order total.
 - Include the credit card fee in each installment invoice,
   proportionally to the planned amount.
+- Show the credit card fee of the sale order in the customer invoice form,
+  both as a listing of the fees per card administrator and in the totals of
+  the invoice.
 - View the fee distribution across installments in the invoice plan.

@@ -5,9 +5,35 @@
         <field name="model">account.move</field>
         <field name="inherit_id" ref="account.view_move_form" />
         <field name="arch" type="xml">
-            <field name="tax_totals" position="before">
+            <!-- The payment methods of the invoice are added by
+                 sale_payment_method, next to the due date. -->
+            <xpath expr="//notebook" position="inside">
+                <page
+                    string="Credit Card Fees"
+                    name="credit_card_fees"
+                    invisible="not credit_card_fee_line_ids"
+                >
+                    <field name="credit_card_fee_line_ids" nolabel="1" readonly="1">
+                        <list create="false" delete="false">
+                            <field
+                                name="payment_method_id"
+                                string="Credit Card Administrator"
+                            />
+                            <field name="sum_fee" string="Add Fee" />
+                            <field
+                                name="fee_range_id"
+                                string="Credit Card Fee Range"
+                            />
+                            <field name="fee_percent" string="Fee (%)" />
+                            <field name="amount" string="Amount" />
+                            <field name="fee_amount" string="Fee Amount" />
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+            <field name="tax_totals" position="after">
                 <div
-                    class="oe_subtotal_footer_separator pb-2"
+                    class="oe_subtotal_footer_separator pt-2"
                     invisible="not credit_card_fee_amount"
                 >
                     <div class="d-flex justify-content-between">
@@ -43,14 +69,6 @@
                         />
                     </div>
                 </div>
-            </field>
-            <field name="invoice_payment_term_id" position="after">
-                <field
-                    name="payment_method_ids"
-                    widget="many2many_tags"
-                    placeholder="Payment Methods"
-                    invisible="not payment_method_ids"
-                />
             </field>
         </field>
     </record>
