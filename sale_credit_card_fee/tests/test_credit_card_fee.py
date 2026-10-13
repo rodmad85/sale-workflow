@@ -669,6 +669,27 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
         self.assertEqual(order.credit_card_fee_percent_sum, 0.0)
         self.assertEqual(order.credit_card_fee_amount, 0.0)
 
+    def test_unlink_order_line_without_admin(self):
+        """An order without a credit card can have its lines removed."""
+        order = Form(self.env["sale.order"])
+        order.partner_id = self.partner
+        with order.order_line.new() as line:
+            line.product_id = self.product
+            line.product_uom_qty = 1
+        order = order.save()
+        order.order_line.unlink()
+        self.assertFalse(order.order_line)
+
+    def test_unlink_order_line_refreshes_the_fee_amounts(self):
+        """Removing a line gives the fee amounts the new total of the order."""
+        order = self._create_sale_order()
+        order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
+        line = order.credit_card_fee_line_ids
+        self.assertEqual(line.amount, self._expected_amount(order))
+        order.order_line.unlink()
+        self.assertEqual(line.amount, 0.0)
+        self._assert_amounts_add_up_to_the_total(order)
+
     def test_fee_amount_included_in_total(self):
         order = self._create_sale_order()
         total_before = order.amount_total
@@ -1043,4 +1064,3 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
                 ),
                 model,
             )
-

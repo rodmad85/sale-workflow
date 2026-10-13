@@ -27,5 +27,9 @@ class SaleOrderLine(models.Model):
     def unlink(self):
         orders = self.order_id
         res = super().unlink()
-        orders._refresh_credit_card_fee_amounts()
+        # The lines are gone, so the fee amounts have to be refreshed on the
+        # orders themselves. This is a no-op for orders without credit card
+        # fee lines.
+        for order in orders:
+            order.credit_card_fee_line_ids._check_amounts()
         return res
