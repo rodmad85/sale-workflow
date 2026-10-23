@@ -1,4 +1,5 @@
 from odoo import api, fields, models
+from odoo.exceptions import ValidationError
 
 
 class SaleOrder(models.Model):
@@ -98,6 +99,7 @@ class SaleOrder(models.Model):
         orders = super().create(vals_list)
         orders._sync_credit_card_fee_lines()
         orders.credit_card_fee_line_ids._check_amounts()
+        orders._validate_credit_card_fee_lines()
         return orders
 
     def write(self, vals):
