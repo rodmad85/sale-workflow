@@ -120,11 +120,13 @@ class SaleOrder(models.Model):
                 edited = lines._amounts_changed(stored)
             lines._check_amounts(edited=edited or None)
             lines.write({"edited_amount": False})
+            self._validate_credit_card_fee_lines()
             return res
         res = super().write(vals)
         if vals.get("payment_method_ids"):
             self._sync_credit_card_fee_lines()
         self.credit_card_fee_line_ids._check_amounts()
+        self._validate_credit_card_fee_lines()
         return res
 
     def _credit_card_fee_base(self):
@@ -146,6 +148,26 @@ class SaleOrder(models.Model):
         """
         self.ensure_one()
         return self._credit_card_fee_base()
+
+    def _validate_credit_card_fee_lines(self):
+        """Validate that every fee line has a fee range when there is one.
+
+        When the order has at least one fee line, every one of them must have
+        a fee range selected; otherwise a validation error is raised pointing
+        at the line that is missing it.
+        """
+        for order in self:
+            lines = order.credit_card_fee_line_ids
+            if not lines:
+                continue
+            missing = lines.filtered(lambda line: not line.fee_range_id)
+            if missing:
+                raise ValidationError(
+                    self.env._(
+                        "A faixa de taxa de cartão deve ser preenchida em "
+                        "todas as linhas de taxa do pedido de venda."
+                    )
+                )
 
     @api.depends(
         "credit_card_fee_line_ids",
