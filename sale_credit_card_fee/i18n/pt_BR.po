@@ -184,6 +184,14 @@ msgid "Fee Amount"
 msgstr "Valor da Taxa"
 
 #. module: sale_credit_card_fee
+#: model:ir.model.fields,field_description:sale_credit_card_fee.field_sale_invoice_plan__credit_card_transaction_code
+#: model:ir.model.fields,field_description:sale_credit_card_fee.field_sale_order_credit_card_fee_line__transaction_code
+#: model_terms:ir.ui.view,arch_db:sale_credit_card_fee.view_order_form_inherit_card_fee
+#: model_terms:ir.ui.view,arch_db:sale_credit_card_fee.view_move_form_inherit_card_fee
+msgid "Transaction Code"
+msgstr "Código da Transação"
+
+#. module: sale_credit_card_fee
 #: model:ir.model.fields,help:sale_credit_card_fee.field_sale_order_credit_card_fee_line__fee_amount
 msgid "Fee of this payment method, charged on the amount."
 msgstr "Taxa deste método de pagamento, cobrada sobre o valor."
