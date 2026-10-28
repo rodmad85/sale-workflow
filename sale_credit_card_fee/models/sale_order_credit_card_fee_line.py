@@ -19,6 +19,9 @@ class SaleOrderCreditCardFeeLine(models.Model):
         ondelete="restrict",
         domain="[('credit_card_admin', '=', True)]",
     )
+    transaction_code = fields.Char(
+        string="Transaction Code",
+    )
     sum_fee = fields.Boolean(
         string="Add Fee",
         default=True,

@@ -28,6 +28,7 @@
                                     string="Fee Amount"
                                     readonly="1"
                                 />
+                                <field name="transaction_code"/>
                                 <!-- technical fields of the checks: the
                                      client sends them back and forth with
                                      the amount of the row -->

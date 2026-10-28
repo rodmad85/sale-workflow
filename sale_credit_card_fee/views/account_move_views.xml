@@ -27,6 +27,7 @@
                             <field name="fee_percent" string="Fee (%)" />
                             <field name="amount" string="Amount" />
                             <field name="fee_amount" string="Fee Amount" />
+                            <field name="transaction_code"/>
                         </list>
                     </field>
                 </page>
