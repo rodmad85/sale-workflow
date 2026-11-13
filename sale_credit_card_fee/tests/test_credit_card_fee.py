@@ -114,14 +114,24 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
             }
         )
 
+    def _default_fee_range(self, method):
+        """Return the first fee range of a card administrator."""
+        return method.fee_line_ids.sorted("installments_from")[:1]
+
     def _create_sale_order(self, methods=None):
         order_form = Form(self.env["sale.order"])
         order_form.partner_id = self.partner
         with order_form.order_line.new() as line:
             line.product_id = self.product
             line.product_uom_qty = 1
-        for method in methods or [self.payment_method]:
+        methods = methods or [self.payment_method]
+        for method in methods:
             order_form.payment_method_ids.add(method)
+        # The fee range is required to save an order with card administrator
+        # fee lines, so the previews below always have a fee to compute.
+        for index, method in enumerate(methods):
+            with order_form.credit_card_fee_line_ids.edit(index) as fee_line:
+                fee_line.fee_range_id = self._default_fee_range(method)
         return order_form.save()
 
     def _create_admin_method(self, name, code, percent, installments=(1, 12)):
@@ -396,7 +406,23 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
         order = self._create_sale_order()
         order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
         first = order.credit_card_fee_line_ids
-        order.write({"payment_method_ids": [(4, self.second_method.id)]})
+        order.write(
+            {
+                "payment_method_ids": [(4, self.second_method.id)],
+                "credit_card_fee_line_ids": [
+                    (
+                        0,
+                        0,
+                        {
+                            "payment_method_id": self.second_method.id,
+                            "fee_range_id": self._default_fee_range(
+                                self.second_method
+                            ).id,
+                        },
+                    )
+                ],
+            }
+        )
         self.assertEqual(len(order.credit_card_fee_line_ids), 2)
         new_line = order.credit_card_fee_line_ids - first
         self.assertEqual(new_line.payment_method_id, self.second_method)
@@ -641,6 +667,11 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
 
     def test_different_installment_range(self):
         order = self._create_sale_order()
+        order.credit_card_fee_line_ids.fee_range_id = (
+            self.payment_method.fee_line_ids.filtered(
+                lambda fee: fee.fee_percent == 3.5
+            )
+        )
         order.create_invoice_plan(5, "2025-01-01", 1, "month", False)
         self.assertEqual(order.credit_card_fee_percent, "3.5")
 
@@ -692,10 +723,10 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
 
     def test_fee_amount_included_in_total(self):
         order = self._create_sale_order()
-        total_before = order.amount_total
+        base = order._credit_card_fee_base()
         order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
         expected_fee = self._expected_fee(order, 2.5)
-        expected_total = total_before + expected_fee
+        expected_total = base + expected_fee
         self.assertEqual(order.amount_total, expected_total)
         self.assertAlmostEqual(order.credit_card_amount_plus_fee, expected_total)
 
@@ -720,6 +751,8 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
             line.product_id = product
             line.product_uom_qty = 1
         order_form.payment_method_ids.add(self.payment_method)
+        with order_form.credit_card_fee_line_ids.edit(0) as fee_line:
+            fee_line.fee_range_id = self._default_fee_range(self.payment_method)
         order = order_form.save()
         order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
         self.assertEqual(order.credit_card_fee_percent, "2.5")
@@ -743,10 +776,11 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
 
     def test_sum_fee_false_keeps_total(self):
         order = self._create_sale_order()
-        total_before = order.amount_total
+        base = order._credit_card_fee_base()
         order.credit_card_fee_line_ids.sum_fee = False
         order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
-        self.assertEqual(order.amount_total, total_before)
+        # Add Fee is off: the fee is tracked but not added to the order.
+        self.assertEqual(order.amount_total, base)
         self.assertEqual(order.credit_card_fee_percent, "2.5")
         self.assertAlmostEqual(
             order.credit_card_fee_amount,
@@ -769,7 +803,7 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
         order.credit_card_fee_line_ids.sum_fee = True
         self.assertEqual(order.amount_total, total_with_fee)
 
-    def _create_wizard(self, order, num_installment=3):
+    def _create_wizard(self, order, num_installment=3, advance=False):
         wizard_form = Form(
             self.env["sale.create.invoice.plan"].with_context(
                 active_id=order.id,
@@ -777,11 +811,43 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
             )
         )
         wizard_form.num_installment = num_installment
+        wizard_form.advance = advance
         return wizard_form.save()
+
+    def _create_advance_invoice(self, order, percent=10.0):
+        """Create the down payment (entrada) invoice of the invoice plan."""
+        plan = order.invoice_plan_ids.filtered(
+            lambda plan: plan.invoice_type == "advance"
+        )
+        plan.percent = percent
+        wizard = self.env["sale.advance.payment.inv"].with_context(
+            active_id=order.id,
+            active_ids=order.ids,
+            active_model="sale.order",
+        )
+        wizard = wizard.create(
+            {
+                "advance_payment_method": "percentage",
+                "amount": percent,
+            }
+        )
+        wizard.with_context(invoice_plan_id=plan.id).create_invoices()
+        return plan.invoice_move_ids
+
+    def _create_installment_invoice(self, order, plan):
+        """Create the invoice of one installment of the invoice plan."""
+        wizard = self.env["sale.advance.payment.inv"].with_context(
+            active_id=order.id,
+            active_ids=order.ids,
+            active_model="sale.order",
+        )
+        wizard = wizard.create({"advance_payment_method": "delivered"})
+        wizard.with_context(invoice_plan_id=plan.id).create_invoices()
+        return plan.invoice_move_ids
 
     def test_wizard_show_fee_preview(self):
         order = self._create_sale_order()
-        total_before = order.amount_total
+        base = order._credit_card_fee_base()
         wizard = self._create_wizard(order)
         self.assertEqual(wizard.credit_card_fee_percent, 2.5)
         self.assertAlmostEqual(
@@ -789,7 +855,7 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
             self._expected_fee(order, 2.5),
             places=2,
         )
-        expected_total = total_before + wizard.credit_card_fee_amount
+        expected_total = base + wizard.credit_card_fee_amount
         self.assertAlmostEqual(wizard.amount_plus_fee, expected_total)
         wizard.sale_create_invoice_plan()
         self.assertEqual(order.credit_card_fee_percent, "2.5")
@@ -797,7 +863,7 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
 
     def test_wizard_show_fee_preview_with_multiple_admin_methods(self):
         order = self._create_sale_order([self.payment_method, self.second_method])
-        total_before = order.amount_total
+        base = order._credit_card_fee_base()
         wizard = self._create_wizard(order)
         self.assertEqual(wizard.credit_card_fee_percent, 2.5 + 1.5)
         amount = self._expected_amount(order)
@@ -806,7 +872,7 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
             self._expected_line_fee(order, 2.5, amount),
         )
         self.assertAlmostEqual(
-            wizard.amount_plus_fee, total_before + wizard.credit_card_fee_amount
+            wizard.amount_plus_fee, base + wizard.credit_card_fee_amount
         )
         wizard.sale_create_invoice_plan()
         # The preview is the fee charged once the plan is created.
@@ -866,11 +932,62 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
         ).sorted("installment")
         move = order.with_context(invoice_plan_id=plans[0].id)._create_invoices()
         self.assertEqual(move.credit_card_fee_percent, 2.5)
+        # The invoice shows the fee it is charged with, the share of the
+        # installment, and its own final value, not the whole order values.
         self.assertAlmostEqual(
-            move.credit_card_fee_amount, order.credit_card_fee_amount
+            move.credit_card_fee_amount, plans[0].credit_card_fee_amount
+        )
+        self.assertAlmostEqual(move.credit_card_amount_plus_fee, move.amount_total)
+
+    def test_advance_invoice_is_not_charged_with_the_fee(self):
+        """The down payment (entrada) invoice holds no credit card fee.
+
+        The Add Fee option adds the fee to the sale order total and to the
+        installment invoices only: the entrada invoice is charged with the
+        amount of the order alone.
+        """
+        order = self._create_sale_order()
+        wizard = self._create_wizard(order, advance=True)
+        wizard.sale_create_invoice_plan()
+        order.invoice_plan_ids.filtered(
+            lambda plan: plan.invoice_type == "advance"
+        ).percent = 10.0
+        self._confirm_sale_order(order)
+        advance_invoice = self._create_advance_invoice(order)
+        self.assertEqual(len(advance_invoice), 1)
+        product = self.env.ref("sale_credit_card_fee.product_credit_card_fee")
+        self.assertFalse(
+            advance_invoice.invoice_line_ids.filtered(
+                lambda line: line.product_id == product
+            )
+        )
+        self.assertEqual(advance_invoice.credit_card_fee_amount, 0.0)
+        self.assertAlmostEqual(
+            advance_invoice.credit_card_amount_plus_fee,
+            advance_invoice.amount_total,
+        )
+        # The entrada is 10% of the order, taxes included, without the fee.
+        self.assertAlmostEqual(
+            advance_invoice.amount_total, order._credit_card_fee_base() * 0.10
+        )
+        # The next invoices do not change the entrada invoice either.
+        plan = order.invoice_plan_ids.filtered(
+            lambda p: p.invoice_type == "installment"
+        ).sorted("installment")[0]
+        installment_invoice = self._create_installment_invoice(order, plan)
+        self.assertTrue(
+            installment_invoice.invoice_line_ids.filtered(
+                lambda line: line.product_id == product
+            )
+        )
+        advance_invoice.invalidate_recordset()
+        self.assertEqual(advance_invoice.credit_card_fee_amount, 0.0)
+        self.assertAlmostEqual(
+            advance_invoice.credit_card_amount_plus_fee,
+            advance_invoice.amount_total,
         )
         self.assertAlmostEqual(
-            move.credit_card_amount_plus_fee, order.credit_card_amount_plus_fee
+            advance_invoice.amount_total, order._credit_card_fee_base() * 0.10
         )
 
     def test_create_invoice_without_plan_includes_fee(self):
@@ -929,6 +1046,24 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
             sum(fee_lines.mapped("price_unit")),
             order.credit_card_fee_amount,
             places=2,
+        )
+
+    def test_invoice_charges_only_the_fee_lines_with_add_fee(self):
+        """Only the fee the order adds to its total is invoiced."""
+        order = self._create_sale_order([self.payment_method, self.second_method])
+        first, second = order.credit_card_fee_line_ids
+        second.amount = 20.0
+        second.sum_fee = False
+        order.create_invoice_plan(3, "2025-01-01", 1, "month", False)
+        self._confirm_sale_order(order)
+        move = order._create_invoices()
+        product = self.env.ref("sale_credit_card_fee.product_credit_card_fee")
+        fee_lines = move.invoice_line_ids.filtered(
+            lambda line: line.product_id == product
+        )
+        self.assertEqual(len(fee_lines), 1)
+        self.assertAlmostEqual(
+            sum(fee_lines.mapped("price_unit")), first.fee_amount, places=2
         )
 
     def test_create_invoice_without_plan_no_fee_when_sum_fee_false(self):
@@ -995,10 +1130,7 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
             move.credit_card_fee_amount,
             first.credit_card_fee_amount + second.credit_card_fee_amount,
         )
-        self.assertAlmostEqual(
-            move.credit_card_amount_plus_fee,
-            first.credit_card_amount_plus_fee + second.credit_card_amount_plus_fee,
-        )
+        self.assertAlmostEqual(move.credit_card_amount_plus_fee, move.amount_total)
 
     def test_account_move_form_lists_the_fee_lines(self):
         """The fee lines of the order are a listing in the invoice form."""
@@ -1019,6 +1151,7 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
                 "fee_percent",
                 "amount",
                 "fee_amount",
+                "transaction_code",
             },
         )
 
@@ -1037,7 +1170,8 @@ class TestCreditCardFee(AccountTestInvoicingCommon):
         self.assertEqual(fee_lines, order.credit_card_fee_line_ids)
         # the rows and the cards they belong to are read by the accountant
         self.assertEqual(
-            fee_lines.mapped("payment_method_id.name"), self.payment_method.name
+            fee_lines.mapped("payment_method_id.name"),
+            [self.payment_method.name],
         )
         self.assertAlmostEqual(
             fee_lines.fee_amount, order.credit_card_fee_amount, places=2

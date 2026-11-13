@@ -217,11 +217,20 @@ class SaleOrder(models.Model):
             if not lines_fee:
                 continue
             if plan.exists():
-                if plan.sale_id != order or not plan.credit_card_fee_amount:
+                # The fee only goes to the installment invoices: the down
+                # payment (entrada) invoice of the plan is charged with the
+                # amount of the order alone.
+                if (
+                    plan.sale_id != order
+                    or plan.invoice_type != "installment"
+                    or not plan.credit_card_fee_amount
+                ):
                     continue
                 fee_amount = plan.credit_card_fee_amount
             else:
-                fee_amount = order.credit_card_fee_amount
+                # The fee invoiced is the one of the lines whose Add Fee is
+                # on, the same the order adds to its total.
+                fee_amount = lines_fee
             if not fee_amount:
                 continue
             for move in moves:

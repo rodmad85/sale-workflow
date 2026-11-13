@@ -38,8 +38,11 @@ To use this module, you need to:
    order total and to include it proportionally in each installment
    invoice. Leave it unchecked to track the fee without charging it.
 8. Confirm the wizard and invoice the installments from the invoice
-   plan; each customer invoice will contain a *Credit Card Fee* line
-   with its proportional share of the fee.
+   plan; each installment invoice will contain a *Credit Card Fee* line
+   with its proportional share of the fee. The down payment
+   (**entrada**) invoice of the plan is charged with the amount of the
+   order alone: it holds no fee line and its value is not changed by
+   **Add Fee**.
 
 In the totals of the sale order, **Fee (%)** lists the fee of each
 credit card of the order separated by commas (e.g. *2.5, 3.5*), while
@@ -50,6 +53,9 @@ tab lists the rows of the sale orders it comes from, with the payment method,
 the fee range, the **Fee (%)**, the **Amount** the fee is charged on and the
 **Fee Amount**; the tab only shows when there is a card administrator
 involved. The rows are read-only there: the fee is set on the sale order.
-The totals of the invoice show the **Fee (%)**, the **Fee Amount** and the
-**Amount + Fee** of those orders, and the payment methods of the invoice are
-shown in the header, next to the due date.
+The **Fee (%)**, the **Fee Amount** and the **Amount + Fee** of the invoice
+totals are the ones of the invoice itself: **Fee Amount** is what its *Credit
+Card Fee* lines add up to and **Amount + Fee** is its final value. An invoice
+with no fee line, as the down payment (**entrada**) invoice of an invoice
+plan, shows no fee in its totals. The payment methods of the invoice are shown
+in the header, next to the due date.

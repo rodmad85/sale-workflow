@@ -1,5 +1,15 @@
 All notable changes to this module will be documented in this file.
 
+## 18.0.4.1.1 (2026-11-13)
+
+- Show the credit card fee of the invoice itself in its totals, instead
+  of the whole fee of the sale orders it comes from. The down payment
+  (**entrada**) invoice of an invoice plan no longer shows the fee of
+  the order as its own final value: it holds no fee line and its
+  **Amount + Fee** is its own total.
+- Charge the fee on the installment invoices only, and only for the fee
+  lines whose **Add Fee** is enabled.
+
 ## 18.0.4.1.0 (2026-10-08)
 
 - Show the credit card fees of the sale order in the customer invoice
